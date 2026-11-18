@@ -2353,27 +2353,8 @@ function procesarRespuestaAcceso(respuesta, mostrarNotificacion = true) {
                 const li = document.createElement('li');
                 li.textContent = p.nombre;
                 
-                li.onclick = async function() {
-                    if (guardadoGrillaEspecialEnCurso && await guardadoGrillaEspecialEnCurso !== true) {
-                        return;
-                    }
-                    if (cambiosGrillaEspecial.size > 0 && await guardarCambiosGrillaEspecial() !== true) {
-                        return;
-                    }
-                    selectPlanilla.value = p.nombre;
-                    window.currentPlanillaNombre = p.nombre;
-                    ulResultados.style.display = 'none';
-                    currentSpreadsheetId = mapaPlanillas[p.nombre] || p.id || p.spreadsheet_id || (p.planilla_id ? String(p.planilla_id) : '') || p.nombre;
-                    window.planillaSoloLectura = Boolean(mapaPlanillasSoloLectura[p.nombre] || p.soloLectura || p.solo_lectura);
-                    actualizarModoSoloLectura();
-
-                    const btnAbrirDirecto = document.getElementById('btn-abrir-planilla-directo');
-                    if (btnAbrirDirecto) {
-                        btnAbrirDirecto.href = currentSpreadsheetId ? `https://docs.google.com/spreadsheets/d/${currentSpreadsheetId}/edit` : '#';
-                        btnAbrirDirecto.style.display = (window.esUsuarioAdmin && currentSpreadsheetId) ? 'inline-flex' : 'none';
-                    }
-                    if (typeof actualizarVisibilidadAdmin === 'function') actualizarVisibilidadAdmin();
-                    if (currentSpreadsheetId) cargarHojasDePlanilla();
+                li.onclick = function() {
+                    seleccionarPlanillaConConfirmacion(p.nombre, p);
                 };
                 fragment.appendChild(li);
             }
@@ -2386,6 +2367,177 @@ function procesarRespuestaAcceso(respuesta, mostrarNotificacion = true) {
             ulResultados.style.display = 'none';
         }
     };
+
+    function hayCambiosPendientesEnGradoActual() {
+        const hayRegular = (typeof cambiosPendientes !== 'undefined' && cambiosPendientes) ||
+            (typeof hojasModificadasDelAlumno !== 'undefined' && hojasModificadasDelAlumno.size > 0);
+        const hayEspecial = typeof cambiosGrillaEspecial !== 'undefined' && cambiosGrillaEspecial.size > 0;
+        return Boolean(hayRegular || hayEspecial);
+    }
+
+    function mostrarDialogoConfirmarCambioGrado() {
+        return new Promise((resolve) => {
+            const previo = document.getElementById('overlay-confirmar-cambio-grado');
+            if (previo) previo.remove();
+
+            const nombreGradoActual = window.currentPlanillaNombre || 'el grado actual';
+            const overlay = document.createElement('div');
+            overlay.id = 'overlay-confirmar-cambio-grado';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:2600;background:rgba(15,23,42,0.58);display:flex;align-items:center;justify-content:center;padding:16px;';
+
+            overlay.innerHTML = `
+                <div style="background:#ffffff;border-radius:12px;max-width:460px;width:100%;box-shadow:0 20px 40px rgba(15,23,42,0.3);overflow:hidden;border:1px solid #cbd5e1;">
+                    <div style="background:#b45309;color:#ffffff;padding:14px 18px;display:flex;align-items:center;gap:10px;">
+                        <i class="material-icons" style="font-size:22px;">warning</i>
+                        <div style="font-weight:700;font-size:15px;">Cambios sin guardar</div>
+                    </div>
+                    <div style="padding:16px 18px;color:#1e293b;font-size:14px;line-height:1.45;">
+                        Tienes modificaciones sin guardar en <strong>${escaparHtmlBuscador(nombreGradoActual)}</strong>.<br>
+                        ¿Qué deseas hacer antes de pasar al otro grado?
+                    </div>
+                    <div style="padding:12px 18px;background:#f8fafc;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;">
+                        <button type="button" id="btn-cambio-grado-cancelar" style="background:#ffffff;color:#475569;border:1px solid #cbd5e1;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">Cancelar</button>
+                        <button type="button" id="btn-cambio-grado-descartar" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">No guardar</button>
+                        <button type="button" id="btn-cambio-grado-guardar" style="background:#15803d;color:#ffffff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;">
+                            <i class="material-icons" style="font-size:17px;">save</i> Guardar y cambiar
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+
+            const finalizar = (decision) => {
+                document.removeEventListener('keydown', onKeyDown);
+                overlay.remove();
+                resolve(decision);
+            };
+            const onKeyDown = (e) => {
+                if (e.key === 'Escape') finalizar('cancelar');
+            };
+            document.addEventListener('keydown', onKeyDown);
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) finalizar('cancelar');
+            });
+            overlay.querySelector('#btn-cambio-grado-cancelar').addEventListener('click', () => finalizar('cancelar'));
+            overlay.querySelector('#btn-cambio-grado-descartar').addEventListener('click', () => finalizar('descartar'));
+            overlay.querySelector('#btn-cambio-grado-guardar').addEventListener('click', () => finalizar('guardar'));
+        });
+    }
+
+    async function confirmarYResolverCambiosAntesDeCambiarGrado() {
+        if (guardadoGrillaEspecialEnCurso) {
+            const okEnCurso = await guardadoGrillaEspecialEnCurso;
+            if (okEnCurso !== true) return false;
+        }
+        if (typeof forzarSincronizacionAntesDeGuardar === 'function') {
+            forzarSincronizacionAntesDeGuardar();
+        }
+        if (!hayCambiosPendientesEnGradoActual()) {
+            return true;
+        }
+
+        const decision = await mostrarDialogoConfirmarCambioGrado();
+        if (decision === 'cancelar') {
+            if (selectPlanilla && window.currentPlanillaNombre) {
+                selectPlanilla.value = window.currentPlanillaNombre;
+            }
+            return false;
+        }
+
+        if (decision === 'descartar') {
+            cambiosPendientes = false;
+            if (typeof hojasModificadasDelAlumno !== 'undefined') hojasModificadasDelAlumno.clear();
+            if (typeof cambiosGrillaEspecial !== 'undefined') cambiosGrillaEspecial.clear();
+            if (btnGuardar) {
+                btnGuardar.textContent = 'Sin cambios';
+                btnGuardar.disabled = true;
+                btnGuardar.classList.remove('orange', 'red');
+                btnGuardar.classList.add('grey');
+            }
+            return true;
+        }
+
+        // decision === 'guardar'
+        if (typeof cambiosGrillaEspecial !== 'undefined' && cambiosGrillaEspecial.size > 0) {
+            const okEspecial = await guardarCambiosGrillaEspecial();
+            return okEspecial === true;
+        }
+
+        const dniAnterior = window.dniAlumnoActual;
+        const hojasPendientes = typeof hojasModificadasDelAlumno !== 'undefined'
+            ? new Set(hojasModificadasDelAlumno)
+            : new Set();
+
+        const guardadoOk = await new Promise((resolve) => {
+            let resuelto = false;
+            const resolverSeguro = (val) => {
+                if (resuelto) return;
+                resuelto = true;
+                resolve(val);
+            };
+            const timeoutGuardado = setTimeout(() => {
+                resolverSeguro(!hayCambiosPendientesEnGradoActual());
+            }, 30000);
+
+            ejecutarGuardadoLote(() => {
+                clearTimeout(timeoutGuardado);
+                resolverSeguro(true);
+            }, dniAnterior, hojasPendientes);
+        });
+
+        if (!guardadoOk || hayCambiosPendientesEnGradoActual()) {
+            M.toast({ html: '⚠️ No se pudieron guardar todos los cambios. Revisa antes de cambiar de grado.', classes: 'orange darken-3' });
+            return false;
+        }
+        return true;
+    }
+
+    let cambioGradoEnCurso = false;
+    async function seleccionarPlanillaConConfirmacion(nombrePlanilla, planillaObj = null) {
+        if (cambioGradoEnCurso) return;
+        const nombreDestino = String(nombrePlanilla || '').trim();
+        if (!nombreDestino) return;
+
+        const nuevoId = (planillaObj && (mapaPlanillas[planillaObj.nombre] || planillaObj.id || planillaObj.spreadsheet_id || (planillaObj.planilla_id ? String(planillaObj.planilla_id) : ''))) ||
+            mapaPlanillas[nombreDestino] ||
+            nombreDestino;
+
+        if (currentSpreadsheetId === nuevoId && window.currentPlanillaNombre === nombreDestino) {
+            const ulRes = document.getElementById('ul-resultados-planillas');
+            if (ulRes) ulRes.style.display = 'none';
+            return;
+        }
+
+        cambioGradoEnCurso = true;
+        try {
+            const puedeContinuar = await confirmarYResolverCambiosAntesDeCambiarGrado();
+            if (!puedeContinuar) return;
+
+            selectPlanilla.value = nombreDestino;
+            window.currentPlanillaNombre = nombreDestino;
+            const ulRes = document.getElementById('ul-resultados-planillas');
+            if (ulRes) ulRes.style.display = 'none';
+
+            currentSpreadsheetId = nuevoId;
+            window.planillaSoloLectura = Boolean(
+                mapaPlanillasSoloLectura[nombreDestino] ||
+                (planillaObj && (planillaObj.soloLectura || planillaObj.solo_lectura))
+            );
+            actualizarModoSoloLectura();
+
+            const btnAbrirDirecto = document.getElementById('btn-abrir-planilla-directo');
+            if (btnAbrirDirecto) {
+                btnAbrirDirecto.href = currentSpreadsheetId ? `https://docs.google.com/spreadsheets/d/${currentSpreadsheetId}/edit` : '#';
+                btnAbrirDirecto.style.display = (window.esUsuarioAdmin && currentSpreadsheetId) ? 'inline-flex' : 'none';
+            }
+            if (typeof actualizarVisibilidadAdmin === 'function') actualizarVisibilidadAdmin();
+            if (currentSpreadsheetId) cargarHojasDePlanilla();
+        } finally {
+            cambioGradoEnCurso = false;
+        }
+    }
     
     // Registrar listeners una única vez para evitar acumulaciones
     if (!selectPlanilla._listenersRegistrados) {
@@ -2394,7 +2546,7 @@ function procesarRespuestaAcceso(respuesta, mostrarNotificacion = true) {
             if (typeof selectPlanilla._renderizarActual === 'function') {
                 selectPlanilla._renderizarActual(this.value);
             }
-            if (cambiosGrillaEspecial.size === 0 && !guardadoGrillaEspecialEnCurso) {
+            if (!hayCambiosPendientesEnGradoActual() && !guardadoGrillaEspecialEnCurso) {
                 currentSpreadsheetId = null;
             }
             window.planillaSoloLectura = false;
@@ -2418,27 +2570,14 @@ function procesarRespuestaAcceso(respuesta, mostrarNotificacion = true) {
                 if (primerLi && ulRes.style.display !== 'none') {
                     primerLi.click();
                 } else if (this.value && mapaPlanillas[this.value]) {
-                    const nombre = this.value;
-                    currentSpreadsheetId = mapaPlanillas[nombre] || nombre;
-                    window.currentPlanillaNombre = nombre;
-                    window.planillaSoloLectura = Boolean(mapaPlanillasSoloLectura[nombre]);
-                    actualizarModoSoloLectura();
-                    if (ulRes) ulRes.style.display = 'none';
-                    cargarHojasDePlanilla();
+                    seleccionarPlanillaConConfirmacion(this.value);
                 }
             }
         });
 
         selectPlanilla.addEventListener('change', function() {
             if (this.value && mapaPlanillas[this.value] && currentSpreadsheetId !== mapaPlanillas[this.value]) {
-                const nombre = this.value;
-                currentSpreadsheetId = mapaPlanillas[nombre] || nombre;
-                window.currentPlanillaNombre = nombre;
-                window.planillaSoloLectura = Boolean(mapaPlanillasSoloLectura[nombre]);
-                actualizarModoSoloLectura();
-                const ulRes = document.getElementById('ul-resultados-planillas');
-                if (ulRes) ulRes.style.display = 'none';
-                cargarHojasDePlanilla();
+                seleccionarPlanillaConConfirmacion(this.value);
             }
         });
 
