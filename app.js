@@ -118,9 +118,9 @@ async function verificarYNotificarEstadoSupabase() {
             const yaNotificado = sessionStorage.getItem('alerta_supabase_pausada_enviada');
             if (!yaNotificado) {
                 sessionStorage.setItem('alerta_supabase_pausada_enviada', '1');
-                fetch('/.netlify/functions/apps-script-proxy', {
+                fetch(getRandomAppsScriptUrl(), {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         action: 'notificarAlertaSupabasePausada',
                         payload: {
