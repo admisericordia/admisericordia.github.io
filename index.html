@@ -2475,6 +2475,36 @@
         </div>
 
         <div id="contenedor-edicion-permisos" style="display: none; flex-direction: column; flex: 1; min-height: 0;">
+          <!-- 1b. Clave / Contraseña de Acceso del Docente -->
+          <div id="panel-clave-docente-permisos" style="background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <span style="color: #4c1d95; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 5px;">
+                <i class="material-icons tiny">vpn_key</i> Contraseña de Acceso:
+              </span>
+              <div style="display: inline-flex; align-items: center; background: #fff; border: 1px solid #a78bfa; border-radius: 6px; padding: 2px 6px;">
+                <input
+                  id="input-clave-docente-permisos"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Sin clave asignada"
+                  style="border: none !important; box-shadow: none !important; margin: 0 !important; height: 28px !important; width: 150px; font-family: monospace; font-size: 14px; font-weight: 700; color: #1e293b; letter-spacing: 0.08em;"
+                />
+                <button type="button" id="btn-toggle-visibilidad-clave" onclick="window.toggleVisibilidadClaveDocentePermisos()" title="Ocultar / mostrar contraseña" style="background: transparent; border: none; color: #64748b; cursor: pointer; display: inline-flex; align-items: center; padding: 2px 4px;">
+                  <i class="material-icons" style="font-size: 18px;">visibility_off</i>
+                </button>
+              </div>
+              <span id="badge-estado-clave-docente" style="font-size: 11.5px; color: #5b21b6; font-weight: 600;"></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <button type="button" class="btn-small blue-grey lighten-5 waves-effect" onclick="window.generarClaveAleatoriaDocentePermisos()" title="Generar nueva clave aleatoria de 6 dígitos" style="color: #4c1d95; border: 1px solid #c4b5fd; border-radius: 6px; font-size: 11.5px; height: 30px; line-height: 30px; text-transform: none; box-shadow: none; padding: 0 10px;">
+                <i class="material-icons left tiny" style="margin-right: 4px;">casino</i> Generar 6 dígitos
+              </button>
+              <button type="button" id="btn-guardar-clave-docente" class="btn-small deep-purple darken-2 waves-effect waves-light" onclick="window.guardarClaveDocentePermisos()" style="border-radius: 6px; font-size: 12px; height: 30px; line-height: 30px; text-transform: none; padding: 0 12px;">
+                <i class="material-icons left tiny" style="margin-right: 4px;">save</i> Actualizar Clave
+              </button>
+            </div>
+          </div>
+
           <!-- 2. Asignación Rápida Masiva (Solo para docentes de grados regulares; se oculta para materias especiales) -->
           <div id="panel-asignacion-rapida-masiva" style="background: #fdfbfd; border: 1px solid #ce93d8; border-radius: 8px; padding: 10px 16px; margin-bottom: 10px; flex-shrink: 0;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">

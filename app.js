@@ -11107,7 +11107,7 @@ window.abrirModalPermisosDocentes = async function() {
 
     try {
         const [resUsuarios, resDocPlanillas] = await Promise.all([
-            supabaseClient.from('app_adm_config').select('id, email, Email, es_admin, planillas').order('id', { ascending: true }),
+            supabaseClient.from('app_adm_config').select('*').order('id', { ascending: true }),
             supabaseClient.from('docente_planillas').select('docente_email, solo_lectura, planillas(id, nombre, spreadsheet_id, activo)')
         ]);
 
@@ -11134,10 +11134,14 @@ window.abrirModalPermisosDocentes = async function() {
         });
 
         // Deduplicar usuarios por email y consolidar sus planillas de todas las filas en app_adm_config
+        const columnasClavePosibles = ['clave', 'Contraseña', 'contrasena', 'contraseña', 'password', 'Password'];
         const usuariosMap = new Map();
         usuariosRaw.forEach(u => {
             const emailNorm = normalizarCorreoCliente(u.email || u.Email || '');
             if (!emailNorm) return;
+
+            const claveFila = extraerClaveUsuario(u);
+            const columnaClaveDetectada = columnasClavePosibles.find(col => Object.prototype.hasOwnProperty.call(u, col)) || 'clave';
 
             let planillasUsuario = [];
             if (Array.isArray(u.planillas)) {
@@ -11151,11 +11155,17 @@ window.abrirModalPermisosDocentes = async function() {
                     id: u.id,
                     email: emailNorm,
                     es_admin: Boolean(u.es_admin),
+                    clave: claveFila,
+                    claveColumna: columnaClaveDetectada,
                     planillas: [...planillasUsuario]
                 });
             } else {
                 const existente = usuariosMap.get(emailNorm);
                 if (u.es_admin) existente.es_admin = true;
+                if (!existente.clave && claveFila) {
+                    existente.clave = claveFila;
+                    existente.claveColumna = columnaClaveDetectada;
+                }
                 if (planillasUsuario.length > 0) {
                     if (existente.planillas.length === 0) {
                         existente.planillas = [...planillasUsuario];
@@ -11242,6 +11252,21 @@ window.cargarDocenteEnGestorPermisos = function(email) {
         window.planillasDocentePermisos.sort(compararPlanillasParaDocente);
     }
     window.abiertosEditoresMaterias = new Set();
+
+    const inputClave = document.getElementById('input-clave-docente-permisos');
+    const badgeClave = document.getElementById('badge-estado-clave-docente');
+    const btnToggleClave = document.getElementById('btn-toggle-visibilidad-clave');
+    if (inputClave) {
+        inputClave.type = 'text';
+        inputClave.value = usuario.clave || '';
+    }
+    if (btnToggleClave) {
+        btnToggleClave.innerHTML = '<i class="material-icons" style="font-size: 18px;">visibility_off</i>';
+    }
+    if (badgeClave) {
+        badgeClave.textContent = usuario.clave ? 'Clave actual cargada' : 'Sin clave configurada';
+        badgeClave.style.color = usuario.clave ? '#5b21b6' : '#c2410c';
+    }
 
     const badge = document.getElementById('badge-tipo-usuario');
     const esDocenteEspecial = esUsuarioPlanillasEspeciales(usuario, window.planillasDocentePermisos);
@@ -11753,6 +11778,88 @@ window.confirmarAgregarPlanillaDocente = async function() {
         M.toast({ html: 'Se asignaron ' + agregadas + ' planillas de ' + grado + '° ' + seccion + ' al docente.', classes: 'green darken-2' });
     } catch (err) {
         M.toast({ html: 'Error al buscar planilla: ' + err.message, classes: 'red darken-2' });
+    }
+};
+
+window.toggleVisibilidadClaveDocentePermisos = function() {
+    const input = document.getElementById('input-clave-docente-permisos');
+    const btn = document.getElementById('btn-toggle-visibilidad-clave');
+    if (!input) return;
+    const esTexto = input.type === 'text';
+    input.type = esTexto ? 'password' : 'text';
+    if (btn) {
+        btn.innerHTML = `<i class="material-icons" style="font-size: 18px;">${esTexto ? 'visibility' : 'visibility_off'}</i>`;
+    }
+};
+
+window.generarClaveAleatoriaDocentePermisos = function() {
+    const input = document.getElementById('input-clave-docente-permisos');
+    const badgeClave = document.getElementById('badge-estado-clave-docente');
+    if (!input) return;
+    const nuevaClave = String(Math.floor(100000 + Math.random() * 900000));
+    input.type = 'text';
+    input.value = nuevaClave;
+    const btnToggle = document.getElementById('btn-toggle-visibilidad-clave');
+    if (btnToggle) {
+        btnToggle.innerHTML = '<i class="material-icons" style="font-size: 18px;">visibility_off</i>';
+    }
+    if (badgeClave) {
+        badgeClave.textContent = 'Sin guardar (pulsa Actualizar Clave)';
+        badgeClave.style.color = '#b45309';
+    }
+};
+
+window.guardarClaveDocentePermisos = async function() {
+    if (!window.docenteSeleccionadoPermisos) return;
+
+    const input = document.getElementById('input-clave-docente-permisos');
+    const badgeClave = document.getElementById('badge-estado-clave-docente');
+    const btn = document.getElementById('btn-guardar-clave-docente');
+    const nuevaClave = String((input && input.value) || '').trim();
+
+    if (!nuevaClave) {
+        M.toast({ html: 'Ingresa una contraseña válida antes de guardar.', classes: 'orange darken-3' });
+        if (input) input.focus();
+        return;
+    }
+
+    const emailDocente = window.docenteSeleccionadoPermisos.email;
+    const columnaClave = window.docenteSeleccionadoPermisos.claveColumna || 'clave';
+    const htmlOriginal = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="material-icons left tiny" style="margin-right: 4px;">hourglass_empty</i> Guardando...';
+    }
+
+    try {
+        const updatePayload = {};
+        updatePayload[columnaClave] = nuevaClave;
+
+        const { error } = await supabaseClient
+            .from('app_adm_config')
+            .update(updatePayload)
+            .or(`email.ilike.${emailDocente},Email.ilike.${emailDocente}`);
+
+        if (error) throw error;
+
+        window.docenteSeleccionadoPermisos.clave = nuevaClave;
+        if (Array.isArray(window.listaDocentesConfigCache)) {
+            const cached = window.listaDocentesConfigCache.find(u => u.email === emailDocente);
+            if (cached) cached.clave = nuevaClave;
+        }
+        if (badgeClave) {
+            badgeClave.textContent = '✅ Clave actualizada';
+            badgeClave.style.color = '#15803d';
+        }
+        M.toast({ html: `✅ Contraseña actualizada para ${emailDocente}`, classes: 'green darken-2', displayLength: 3500 });
+    } catch (err) {
+        console.error('Error actualizando contraseña del docente:', err);
+        M.toast({ html: '❌ Error al actualizar la contraseña: ' + err.message, classes: 'red darken-3' });
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = htmlOriginal;
+        }
     }
 };
 
