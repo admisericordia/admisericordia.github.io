@@ -461,11 +461,12 @@ function iniciarModuloMigracion(modoInicial) {
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px;">
                         <div style="background:#fff; border: 1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
                             <div style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">Estado Sincronizador</div>
-                            <div id="sync-ui-status" style="font-size:0.9rem; font-weight:800; color:#15803d; margin-top:3px;">🟢 ACTIVO (Tiempo Real)</div>
+                            <div id="sync-ui-status" style="font-size:0.86rem; font-weight:800; color:#15803d; margin-top:3px;">🟢 ACTIVO (Diario 03:00 AM + Manual)</div>
                         </div>
                         <div style="background:#fff; border: 1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
                             <div style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">Última Sincronización</div>
                             <div id="sync-ui-last-time" style="font-size:0.82rem; font-weight:700; color:#0f172a; margin-top:3px;">Consultando...</div>
+                            <div id="sync-ui-result" style="font-size:0.74rem; font-weight:700; color:#64748b; margin-top:3px;">-</div>
                         </div>
                         <div style="background:#fff; border: 1px solid #e2e8f0; border-radius:8px; padding:10px; text-align:center;">
                             <div style="font-size:0.68rem; font-weight:700; color:#64748b; text-transform:uppercase;">Planillas Sincronizadas</div>
@@ -1417,38 +1418,116 @@ function iniciarModuloMigracion(modoInicial) {
     });
 
     
+    const AUDIT_SYNC_URL = 'https://iqnmysppdoytbxipvfhr.supabase.co';
+    const AUDIT_SYNC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlxbm15c3BwZG95dGJ4aXB2ZmhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxNDcxODYsImV4cCI6MjEwNzcyMzE4Nn0.FUjjn_GfhIBbH-Et_CGyxrip5jqxTvj5yRWwKmerpec';
+
+    async function obtenerUltimoEstadoSyncDesdeSupabaseUI() {
+        try {
+            const resp = await fetch(
+                `${AUDIT_SYNC_URL}/rest/v1/auditoria?planilla_id=eq.SYNC_SHEETS_GLOBAL&order=created_at.desc&limit=1`,
+                {
+                    headers: {
+                        apikey: AUDIT_SYNC_KEY,
+                        Authorization: `Bearer ${AUDIT_SYNC_KEY}`
+                    }
+                }
+            );
+            if (!resp.ok) return null;
+            const rows = await resp.json();
+            if (!Array.isArray(rows) || rows.length === 0) return null;
+            const row = rows[0];
+            let info = {};
+            try { info = JSON.parse(row.cambios || '{}'); } catch (_) {}
+            return {
+                fechaIso: info.fechaIso || row.created_at || null,
+                exitosa: info.exitosa !== undefined ? Boolean(info.exitosa) : row.dni_alumno === 'EXITOSA',
+                exitosas: Number(info.exitosas || 0),
+                fallidas: Number(info.fallidas || 0),
+                origen: info.origen || row.hoja || 'MANUAL (Web)',
+                estadoTag: row.dni_alumno || (info.exitosa ? 'EXITOSA' : 'FALLIDA')
+            };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function registrarEstadoSyncEnSupabaseUI({ fechaIso, exitosa, exitosas, fallidas, totalDetectadas, origen, detalle }) {
+        try {
+            await fetch(`${AUDIT_SYNC_URL}/rest/v1/auditoria`, {
+                method: 'POST',
+                headers: {
+                    apikey: AUDIT_SYNC_KEY,
+                    Authorization: `Bearer ${AUDIT_SYNC_KEY}`,
+                    'Content-Type': 'application/json',
+                    Prefer: 'return=minimal'
+                },
+                body: JSON.stringify({
+                    usuario: 'sistema-sync-sheets',
+                    planilla_id: 'SYNC_SHEETS_GLOBAL',
+                    nombre_planilla: 'Sincronización Google Sheets ➔ Supabase',
+                    hoja: origen || 'MANUAL (Web)',
+                    dni_alumno: exitosa ? 'EXITOSA' : (exitosas > 0 ? 'PARCIAL' : 'FALLIDA'),
+                    cambios: JSON.stringify({
+                        fechaIso: fechaIso || new Date().toISOString(),
+                        exitosa: Boolean(exitosa),
+                        exitosas: Number(exitosas || 0),
+                        fallidas: Number(fallidas || 0),
+                        totalDetectadas: Number(totalDetectadas || 0),
+                        origen: origen || 'MANUAL (Web)',
+                        detalle: detalle || ''
+                    })
+                })
+            });
+        } catch (_) {}
+    }
+    window.registrarEstadoSyncEnSupabaseUI = registrarEstadoSyncEnSupabaseUI;
+
     async function actualizarEstadoSyncUI() {
         const statusEl = document.getElementById('sync-ui-status');
         const timeEl = document.getElementById('sync-ui-last-time');
+        const resultEl = document.getElementById('sync-ui-result');
         const countEl = document.getElementById('sync-ui-count');
-        const btnKill = document.getElementById('btn-kill-switch-sync');
 
-        try {
-            const res = await fetch('/api/sync-sheets/status').catch(() => null);
-            if (res && res.ok) {
-                const data = await res.json();
-                const st = data.estado || {};
-                if (statusEl) {
-                    statusEl.innerText = st.enabled !== false ? '🟢 ACTIVO (Tiempo Real)' : '🔴 DETENIDO (Pase a producción)';
-                    statusEl.style.color = st.enabled !== false ? '#15803d' : '#b91c1c';
-                }
-                if (btnKill) {
-                    btnKill.innerHTML = st.enabled !== false 
-                        ? '<i class="material-icons left">cancel</i>🛑 PASE A PRODUCCIÓN (KILL-SWITCH)' 
-                        : '<i class="material-icons left">play_arrow</i>🟢 REACTIVAR SINCRONIZADOR';
-                    btnKill.className = st.enabled !== false 
-                        ? 'btn waves-effect waves-light red darken-3' 
-                        : 'btn waves-effect waves-light green darken-3';
-                }
-                if (timeEl) {
-                    timeEl.innerText = st.lastSyncIso ? new Date(st.lastSyncIso).toLocaleString('es-AR') : 'Aún no ejecutado';
-                }
-                if (countEl) {
-                    countEl.innerText = String(st.totalCursosSincronizados || 0);
+        if (statusEl) {
+            statusEl.innerText = '🟢 ACTIVO (Diario 03:00 AM + Manual)';
+            statusEl.style.color = '#15803d';
+        }
+
+        const remoto = await obtenerUltimoEstadoSyncDesdeSupabaseUI();
+        if (remoto && remoto.fechaIso) {
+            const dt = new Date(remoto.fechaIso);
+            const fechaStr = dt.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const horaStr = dt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+            if (timeEl) {
+                timeEl.innerText = `${fechaStr} · ${horaStr}`;
+            }
+            if (resultEl) {
+                const esAuto = /autom[aá]tica/i.test(remoto.origen || '');
+                const tipoTxt = esAuto ? 'Automática' : 'Manual';
+                if (remoto.exitosa && remoto.fallidas === 0) {
+                    resultEl.innerText = `✅ Exitosa (${tipoTxt})`;
+                    resultEl.style.color = '#15803d';
+                } else if (remoto.exitosas > 0) {
+                    resultEl.innerText = `⚠️ Con ${remoto.fallidas} error(es) (${tipoTxt})`;
+                    resultEl.style.color = '#b45309';
+                } else {
+                    resultEl.innerText = `❌ Fallida (${tipoTxt})`;
+                    resultEl.style.color = '#b91c1c';
                 }
             }
-        } catch (e) {}
+            if (countEl) {
+                countEl.innerText = String(remoto.exitosas || 0);
+            }
+            return;
+        }
+
+        if (timeEl) timeEl.innerText = 'Aún no ejecutado';
+        if (resultEl) {
+            resultEl.innerText = 'Sin registros aún';
+            resultEl.style.color = '#64748b';
+        }
     }
+    window.actualizarEstadoSyncUI = actualizarEstadoSyncUI;
 
     const btnTabSync = document.getElementById('tab-btn-sync-sheets');
     if (btnTabSync) {
@@ -2318,16 +2397,26 @@ async function ejecutarSincronizacionManualSheetsUI() {
             }));
         }
 
-        const ahoraStr = new Date().toLocaleString('es-AR');
+        const fechaSyncIso = new Date().toISOString();
+        const dtAhora = new Date(fechaSyncIso);
+        const ahoraStr = `${dtAhora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })} · ${dtAhora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}`;
         if (timeEl) timeEl.textContent = ahoraStr;
         if (progressLabel) progressLabel.textContent = `¡Sincronización finalizada! (${exitosas} planilla(s) actualizadas)`;
 
-        // Registrar en el estado local si el servidor local está disponible
-        fetch('/api/sync-sheets/record-sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cursosSincronizados: exitosas, lastSyncIso: new Date().toISOString() })
-        }).catch(() => {});
+        if (typeof window.registrarEstadoSyncEnSupabaseUI === 'function') {
+            await window.registrarEstadoSyncEnSupabaseUI({
+                fechaIso: fechaSyncIso,
+                exitosa: fallidas === 0,
+                exitosas,
+                fallidas,
+                totalDetectadas: planillasObjetivo.length,
+                origen: 'MANUAL (Web)',
+                detalle: `Sincronización manual (${exitosas} OK, ${fallidas} errores)`
+            });
+        }
+        if (typeof window.actualizarEstadoSyncUI === 'function') {
+            await window.actualizarEstadoSyncUI();
+        }
 
         logConsola(`🏁 Proceso completado: ${exitosas} planilla(s) sincronizadas con éxito${fallidas > 0 ? `, ${fallidas} con error` : ''}.`);
 
@@ -2342,6 +2431,20 @@ async function ejecutarSincronizacionManualSheetsUI() {
     } catch (err) {
         console.error('[SyncSheets] Error en sincronización manual:', err);
         logConsola(`❌ Error general: ${err.message}`);
+        if (typeof window.registrarEstadoSyncEnSupabaseUI === 'function') {
+            await window.registrarEstadoSyncEnSupabaseUI({
+                fechaIso: new Date().toISOString(),
+                exitosa: false,
+                exitosas: 0,
+                fallidas: 1,
+                totalDetectadas: 0,
+                origen: 'MANUAL (Web)',
+                detalle: err.message
+            });
+        }
+        if (typeof window.actualizarEstadoSyncUI === 'function') {
+            await window.actualizarEstadoSyncUI();
+        }
         M.toast({ html: '❌ Error en sincronización: ' + err.message, classes: 'red darken-3' });
     } finally {
         if (btnSyncManual) {

@@ -1,0 +1,22 @@
+name: Sincronización Diaria Google Sheets a Supabase
+
+on:
+  schedule:
+    # Todos los días a las 06:00 UTC (03:00 AM hora Argentina UTC-3)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-sheets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Ejecutar sincronización diaria (Google Sheets -> Supabase)
+        run: node sync-sheets-watcher.js --once
