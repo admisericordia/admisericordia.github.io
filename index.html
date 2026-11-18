@@ -1,0 +1,3214 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <base target="_top" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#1565c0" />
+    <title>Panel de Administración de Grado</title>
+    <link rel="icon" href="escudo misericordia (2) (3).png" type="image/png" />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <script>
+      // Detección automática del endpoint API:
+      // Si corre en Netlify (o con proxy local), usa la ruta relativa /api para evitar saltos 302 y latencia CORS.
+      if (!window.APP_API_URL) {
+        const hostname = window.location.hostname || '';
+        if (hostname.endsWith('netlify.app') || hostname.includes('netlify')) {
+          window.APP_API_URL = "/api";
+        }
+      }
+    </script>
+    <!-- Firebase SDKs compat; la configuración se inicializa en app.js -->
+    <!-- Firebase SDKs v9 Compat -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-functions-compat.js"></script>
+    <style>
+      html,
+      body {
+        min-height: 100vh;
+        width: 100%;
+        margin: 0;
+        background-color: #f4f4f4;
+      }
+      body {
+        padding: 10px 15px;
+        box-sizing: border-box;
+      }
+      .container {
+        max-width: 1180px;
+        margin: 0 auto;
+      }
+      .input-field label,
+      .input-field label.active {
+        color: #424242 !important;
+        font-weight: 500 !important;
+      }
+      .input-field input:focus + label,
+      .input-field select:focus + label {
+        color: #1565c0 !important;
+        font-weight: 600 !important;
+      }
+      ::placeholder {
+        color: #757575 !important;
+        opacity: 1;
+      }
+      .loader-container {
+        text-align: center;
+        padding: 48px 20px 20px;
+        display: none;
+        max-width: 720px;
+        margin: 0 auto;
+        min-height: calc(100vh - 180px);
+        box-sizing: border-box;
+      }
+      .form-card {
+        background-color: #fff;
+        padding: 26px;
+        border-radius: 16px;
+        box-shadow: 0 14px 45px rgba(0, 0, 0, 0.08);
+        margin-top: 20px;
+      }
+      .form-card .input-field {
+        margin-bottom: 18px;
+      }
+      .form-card .input-field .material-icons.prefix {
+        color: #1565c0;
+      }
+      .form-card .input-field input[type="text"],
+      .form-card .input-field select {
+        background: transparent !important;
+        border-bottom: 1px solid #cfd8dc !important;
+      }
+      .form-card .input-field .autocomplete-content {
+        border-radius: 12px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+      }
+      .collection {
+        background-color: #ffffff;
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .sidebar-item {
+        cursor: pointer;
+        color: #555 !important;
+        font-weight: 500;
+        transition:
+          background-color 0.3s ease,
+          color 0.3s ease;
+        display: flex;
+        align-items: center;
+        border-bottom: 1px solid #eee !important;
+        padding: 16px 18px;
+      }
+      .sidebar-item:hover {
+        background-color: #e0f2f1 !important;
+      }
+      .sidebar-item.active {
+        background-color: #08bb70 !important;
+        color: white !important;
+        font-weight: bold;
+        border-bottom: none !important;
+        border-left: 4px solid #00897b !important;
+      }
+      .sidebar-item.active i.material-icons {
+        color: white !important;
+      }
+      .sidebar-item span {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+      }
+      .sidebar-item i.material-icons {
+        margin-right: 10px;
+        color: #757575;
+      }
+      .sidebar-item .icono-alerta {
+        margin-left: auto;
+      }
+      .sidebar-item.active i.material-icons {
+        color: #ffffff !important;
+      }
+      .sidebar-item.incompleta {
+        background-color: #fff9c4 !important;
+        border-left: 4px solid #f57f17 !important;
+      }
+      .contenedor-logo {
+        position: relative;
+        text-align: center;
+        margin-top: 4px;
+        margin-bottom: 4px;
+        min-height: 48px;
+      }
+
+      /* Asegurar que el estado `active` tenga prioridad visual incluso si la hoja
+           está marcada como `incompleta`. Esto evita que la clase `.incompleta`
+           (amarilla) sobrescriba el color verde agua del elemento activo. */
+      .sidebar-item.incompleta.active {
+        background-color: #08bb70 !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        border-left: 4px solid #f57f17 !important;
+      }
+      .sidebar-item.incompleta.active i.material-icons {
+        color: #ffffff !important;
+      }
+      .sidebar-item.incompleta.active .icono-alerta {
+        color: #ffd600 !important;
+        display: inline-flex !important;
+      }
+      #main-content {
+        position: relative;
+        padding-top: 20px;
+      }
+
+      #btn-logout i.material-icons {
+        font-size: 1.4rem;
+      }
+      #modal-dashboard {
+        max-width: 1240px !important;
+        width: 97% !important;
+      }
+      #modal-dashboard .modal-content {
+        min-height: 780px;
+      }
+      #chart_aprobados_materias {
+        min-height: 520px;
+      }
+      #badge-hoja-activa {
+        font-size: 0.8rem;
+        padding: 0 10px;
+        height: auto;
+        line-height: 28px;
+      }
+      #select-planilla {
+        background: transparent !important;
+      }
+      #sidebar-hojas {
+        background-color: #fff;
+      }
+      #contenido-hojas {
+        border-radius: 16px;
+        background-color: #ffffff;
+        padding: 24px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        min-height: 520px;
+      }
+      #section-selectors {
+        position: sticky;
+        top: 72px;
+        z-index: 900;
+        background-color: #fff;
+        padding: 16px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+        width: 100%;
+        box-sizing: border-box;
+      }
+      #section-selectors .selectors-flex-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 14px 20px;
+        width: 100%;
+      }
+      #section-selectors .selector-block-planilla {
+        flex: 1 1 360px;
+        min-inline-size: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 0.85rem;
+      }
+      #section-selectors .selector-block-alumno {
+        flex: 1 1 360px;
+        min-inline-size: 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 0.85rem;
+      }
+      #section-selectors .selector-block-planilla .input-field {
+        flex: 1 1 200px;
+        min-inline-size: 0;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      #section-selectors .selector-block-alumno .input-field {
+        flex: 1 1 250px;
+        min-inline-size: 0;
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+      }
+      #section-selectors .selector-block-planilla .input-field .prefix {
+        width: 2rem !important;
+        font-size: 1.45rem !important;
+        top: 0.45rem !important;
+      }
+      #section-selectors .selector-block-planilla .input-field .prefix ~ input,
+      #section-selectors .selector-block-planilla .input-field .prefix ~ .autocomplete-content {
+        margin-left: 2.1rem !important;
+        width: calc(100% - 2.1rem) !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+      }
+      #section-selectors .selector-block-planilla .input-field .prefix ~ label {
+        margin-left: 2.1rem !important;
+      }
+      #section-selectors .select-wrapper {
+        width: 100%;
+      }
+      #section-selectors .select-wrapper input.select-dropdown {
+        padding-right: 30px !important;
+        box-sizing: border-box !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        margin-bottom: 0 !important;
+      }
+      #section-selectors .select-wrapper .caret {
+        right: 4px !important;
+        z-index: 2 !important;
+        pointer-events: none !important;
+        background-color: #fff !important;
+        padding-left: 4px;
+      }
+      #section-selectors .planilla-actions-toolbar,
+      #section-selectors .alumno-actions-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+        margin-left: auto;
+      }
+      #panel-principal .col.s12.m4.l3 {
+        margin-bottom: 18px;
+        position: sticky;
+        top: 190px;
+        align-self: flex-start;
+        z-index: 800;
+      }
+      #panel-principal .col.s12.m8.l9 {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      #contenido-hojas {
+        flex: 1 1 auto;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+      #panel-principal .col.s12.m8.l9 > .card-panel + .row {
+        margin-top: auto;
+      }
+      #save-button-container button,
+      #btn-abrir-planilla-directo {
+        border-radius: 8px;
+      }
+      #contenedor-boton-admin {
+        display: flex;
+        align-items: center;
+      }
+      /* Menú de Opciones en Barra Superior */
+      .menu-principal-btn {
+        background: linear-gradient(135deg, #0b2e59 0%, #1565c0 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 8px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        padding: 0 14px !important;
+        font-size: 0.74rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 0.4px !important;
+        text-transform: uppercase !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        box-shadow: 0 3px 10px rgba(11, 46, 89, 0.22) !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+      .menu-principal-btn:hover {
+        background: linear-gradient(135deg, #071f3d 0%, #0d47a1 100%) !important;
+        box-shadow: 0 5px 14px rgba(11, 46, 89, 0.32) !important;
+        transform: translateY(-1px) !important;
+      }
+      .menu-principal-btn i.left {
+        font-size: 1.25rem !important;
+        margin: 0 !important;
+      }
+      .menu-principal-btn i.right {
+        font-size: 1.2rem !important;
+        margin: 0 !important;
+        transition: transform 0.2s ease !important;
+      }
+      /* Dropdown Card */
+      .modern-menu-dropdown {
+        background: #ffffff !important;
+        border-radius: 12px !important;
+        box-shadow: 0 16px 36px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08) !important;
+        border: 1px solid #e2e8f0 !important;
+        min-width: 300px !important;
+        max-width: 350px !important;
+        padding: 6px 0 !important;
+        overflow: hidden !important;
+        z-index: 2100 !important;
+      }
+      .modern-menu-dropdown li {
+        min-height: auto !important;
+        clear: both !important;
+      }
+      .modern-menu-dropdown .menu-header-item {
+        min-height: 28px !important;
+        padding: 8px 16px 4px 16px !important;
+        pointer-events: none !important;
+        cursor: default !important;
+        background: transparent !important;
+      }
+      .modern-menu-dropdown .menu-header-item span {
+        font-size: 0.68rem !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        color: #94a3b8 !important;
+      }
+      .modern-menu-dropdown li a.menu-item-link {
+        display: flex !important;
+        align-items: center !important;
+        gap: 12px !important;
+        padding: 10px 16px !important;
+        color: #1e293b !important;
+        line-height: 1.2 !important;
+        text-decoration: none !important;
+        transition: background-color 0.15s ease !important;
+        font-size: 0.85rem !important;
+        height: auto !important;
+      }
+      .modern-menu-dropdown li:hover a.menu-item-link,
+      .modern-menu-dropdown li a.menu-item-link:hover {
+        background-color: #f1f5f9 !important;
+      }
+      .menu-item-icon-circle {
+        width: 34px !important;
+        height: 34px !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex-shrink: 0 !important;
+      }
+      .menu-item-icon-circle i.material-icons {
+        font-size: 1.2rem !important;
+        margin: 0 !important;
+        line-height: 1 !important;
+        height: auto !important;
+      }
+      .icon-auditoria {
+        background-color: #eff6ff !important;
+        color: #1d4ed8 !important;
+      }
+      .icon-boletines {
+        background-color: #f0fdf4 !important;
+        color: #15803d !important;
+      }
+      .icon-migracion {
+        background-color: #faf5ff !important;
+        color: #7e22ce !important;
+      }
+      .icon-pase-grado {
+        background-color: #eff6ff !important;
+        color: #1d4ed8 !important;
+      }
+      .icon-promocion {
+        background-color: #ecfeff !important;
+        color: #0284c7 !important;
+      }
+      .icon-buscador-alumnos {
+        background-color: #e0f2fe !important;
+        color: #0369a1 !important;
+      }
+      .menu-item-info {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 2px !important;
+      }
+      .menu-item-name {
+        font-size: 0.84rem !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+      }
+      .menu-item-desc {
+        font-size: 0.7rem !important;
+        color: #64748b !important;
+        font-weight: 400 !important;
+      }
+      .modern-menu-dropdown .divider {
+        margin: 6px 0 !important;
+        background-color: #e2e8f0 !important;
+        height: 1px !important;
+      }
+      .modal {
+        border-radius: 18px;
+      }
+      .modal-content {
+        padding: 28px 30px;
+      }
+      .card-panel {
+        border-radius: 16px;
+      }
+      .card-panel.blue.lighten-5,
+      .card-panel.red.lighten-5,
+      .card-panel.orange.lighten-5 {
+        padding: 22px;
+      }
+      .btn-floating .material-icons {
+        line-height: 1.6;
+      }
+      .toast .toast-icon {
+        vertical-align: middle;
+        margin-right: 10px;
+        font-size: 1.15rem;
+      }
+      /* Respetar siempre el estado oculto controlado por JS */
+      #contenedor-boton-admin[style*="display: none"],
+      #user-email-display[style*="display: none"],
+      #btn-logout[style*="display: none"] {
+        display: none !important;
+      }
+
+      /* --- AJUSTES PARA TABLETS Y PANTALLAS MEDIANAS (Hasta 1050px) --- */
+      @media (max-width: 1050px) {
+        .form-card {
+          padding: 20px;
+        }
+        #contenido-hojas {
+          min-height: 380px;
+        }
+        #top-header-bar {
+          padding: 8px 16px !important;
+        }
+        #top-header-bar > div:last-child {
+          gap: 12px !important;
+        }
+        #user-email-text {
+          max-width: 160px;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #top-header-bar {
+          flex-wrap: nowrap !important;
+          gap: 8px !important;
+          padding: 8px 12px !important;
+        }
+        #top-header-bar > div:last-child {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          justify-content: flex-end !important;
+          align-items: center !important;
+          gap: 8px !important;
+          min-width: 0 !important;
+        }
+        #top-header-bar > div:last-child > div:last-child {
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+          margin-left: 0 !important;
+        }
+        #user-email-display {
+          max-width: 170px !important;
+          padding-right: 10px !important;
+          font-size: 0.8rem !important;
+        }
+        #user-email-text {
+          max-width: 120px !important;
+          font-size: 0.75rem !important;
+        }
+      }
+
+      /* --- OPTIMIZACIÓN INTEGRAL PARA DISPOSITIVOS MÓVILES (Hasta 600px) --- */
+      @media (max-width: 600px) {
+        body {
+          padding: 6px 8px !important;
+        }
+        .form-card {
+          padding: 16px 14px !important;
+          border-radius: 14px !important;
+          margin-top: 10px !important;
+        }
+        #contenido-hojas {
+          min-height: 320px;
+          padding: 16px 12px !important;
+          border-radius: 14px !important;
+        }
+        #main-content {
+          padding-top: 2px !important;
+        }
+
+        /* 1. Barra Superior (Header) limpia y sin desbordes */
+        #top-header-bar {
+          padding: 8px 12px !important;
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          justify-content: space-between !important;
+          align-items: center !important;
+          gap: 8px !important;
+          border-radius: 14px !important;
+          min-height: 54px !important;
+        }
+        #top-header-bar > div:first-child {
+          height: 38px !important;
+        }
+        #top-header-bar > div:first-child img,
+        #top-header-bar > div:first-child svg {
+          max-height: 38px !important;
+          width: 38px !important;
+          height: 38px !important;
+          display: block !important;
+        }
+        #top-header-bar > div:last-child {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          justify-content: flex-end !important;
+          align-items: center !important;
+          gap: 8px !important;
+          flex: 0 1 auto !important;
+          min-width: 0 !important;
+          overflow: visible !important;
+        }
+        /* Ocultar línea divisoria vertical en móvil */
+        #top-header-bar > div:last-child > div:nth-child(2) {
+          display: none !important;
+        }
+
+        /* Botón Menú de Opciones (Admin/Promoción) compacto en móvil */
+        #contenedor-boton-admin {
+          gap: 6px !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          flex: 0 0 auto !important;
+          overflow: visible !important;
+        }
+        #contenedor-boton-admin #btn-menu-acciones-trigger {
+          width: auto !important;
+          min-width: 38px !important;
+          height: 38px !important;
+          min-height: 38px !important;
+          padding: 0 10px !important;
+          border-radius: 10px !important;
+          justify-content: center !important;
+          gap: 4px !important;
+        }
+        #contenedor-boton-admin #btn-menu-acciones-trigger .material-icons.left {
+          margin: 0 !important;
+          font-size: 1.25rem !important;
+        }
+        #contenedor-boton-admin #btn-menu-acciones-trigger .menu-trigger-label,
+        #contenedor-boton-admin #btn-menu-acciones-trigger .text-btn,
+        #contenedor-boton-admin #btn-menu-acciones-trigger .material-icons.right {
+          display: none !important;
+        }
+        .modern-menu-dropdown {
+          min-width: 265px !important;
+          max-width: calc(100vw - 20px) !important;
+        }
+
+        /* Iconos de Usuario, Wi-Fi y Cerrar Sesión alineados uniformemente */
+        #top-header-bar > div:last-child > div:last-child {
+          display: flex !important;
+          gap: 8px !important;
+          align-items: center !important;
+          flex-shrink: 0 !important;
+          margin-left: 0 !important;
+        }
+        #user-email-display {
+          width: 38px !important;
+          min-width: 38px !important;
+          max-width: 38px !important;
+          height: 38px !important;
+          padding: 0 !important;
+          border-radius: 50% !important;
+          overflow: hidden !important;
+          justify-content: center !important;
+          align-items: center !important;
+        }
+        #user-email-display > div {
+          margin-right: 0 !important;
+          width: 36px !important;
+          height: 36px !important;
+        }
+        #user-email-text {
+          display: none !important;
+        }
+        #internet-status,
+        #btn-logout {
+          width: 38px !important;
+          height: 38px !important;
+          min-width: 38px !important;
+          min-height: 38px !important;
+          flex-shrink: 0 !important;
+          margin: 0 !important;
+        }
+        #btn-logout {
+          border-radius: 10px !important;
+        }
+        #internet-status i.material-icons,
+        #btn-logout i.material-icons {
+          font-size: 1.2rem !important;
+        }
+
+        /* 2. Tarjeta de Selectores (1. Planilla y 2. Alumno) sin superposición de etiquetas */
+        #section-selectors {
+          position: relative !important;
+          top: auto !important;
+          padding: 16px 12px 10px !important;
+          margin-top: 10px !important;
+          margin-bottom: 12px !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          border-radius: 14px !important;
+        }
+        #section-selectors .row {
+          margin-bottom: 0 !important;
+        }
+        #section-selectors .col {
+          padding-left: 4px !important;
+          padding-right: 4px !important;
+        }
+        #section-selectors .col.s12.m6:first-child > div {
+          margin-top: 8px !important;
+        }
+        #section-selectors .input-field {
+          margin-top: 6px !important;
+          margin-bottom: 8px !important;
+        }
+        /* Separación vertical limpia para el segundo selector (2. Seleccionar Alumno) */
+        #section-selectors .input-field.col.s12.m6 {
+          margin-top: 22px !important;
+          margin-bottom: 4px !important;
+        }
+        #select-planilla,
+        #select-alumno,
+        #section-selectors .select-wrapper input.select-dropdown {
+          font-size: 0.92rem !important;
+          height: 2.5rem !important;
+          line-height: 2.5rem !important;
+          margin-bottom: 0 !important;
+        }
+        #section-selectors .input-field .prefix {
+          top: 0.35rem !important;
+          font-size: 1.6rem !important;
+          width: 2.2rem !important;
+        }
+        #section-selectors .input-field .prefix ~ input,
+        #section-selectors .input-field .prefix ~ .autocomplete-content {
+          margin-left: 2.2rem !important;
+          width: calc(100% - 2.2rem) !important;
+        }
+        #section-selectors .input-field .prefix ~ label {
+          margin-left: 2.2rem !important;
+        }
+        /* Conservar el translateY de Materialize para que el label nunca pise el placeholder */
+        #section-selectors .input-field > label.active {
+          transform: translateY(-14px) scale(0.85) !important;
+          transform-origin: 0 0 !important;
+        }
+        #section-selectors .select-wrapper + label {
+          top: -24px !important;
+          font-size: 0.82rem !important;
+        }
+
+        /* 3. Barra de Hojas/Materias fija debajo del Header al hacer scroll */
+        #panel-principal {
+          margin-top: 8px !important;
+        }
+        #panel-principal .col.s12.m4.l3 {
+          position: sticky !important;
+          top: 58px !important;
+          z-index: 950 !important;
+          margin-bottom: 10px !important;
+          padding: 4px 4px !important;
+          background: rgba(244, 244, 244, 0.95) !important;
+          backdrop-filter: blur(6px);
+          border-radius: 12px;
+        }
+
+        /* --- Sidebar y Chat (Sin cambios, solo copiados por completitud) --- */
+        #sidebar-hojas {
+          display: flex !important;
+          flex-wrap: nowrap !important;
+          align-items: center !important;
+          overflow-x: auto !important;
+          overflow-y: hidden !important;
+          -webkit-overflow-scrolling: touch !important;
+          padding: 6px 4px !important;
+          gap: 8px !important;
+          margin-bottom: 12px !important;
+          background: transparent !important;
+          min-height: 60px !important;
+          scrollbar-width: thin !important;
+          scroll-snap-type: x mandatory !important;
+        }
+        #sidebar-hojas::-webkit-scrollbar {
+          height: 8px;
+        }
+        #sidebar-hojas::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.08);
+          border-radius: 999px;
+        }
+        #sidebar-hojas::-webkit-scrollbar-thumb {
+          background: #ff9800;
+          border-radius: 999px;
+        }
+        #sidebar-hojas .sidebar-item {
+          flex: 0 0 auto !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          min-width: 106px !important;
+          max-width: 150px !important;
+          height: 46px !important;
+          padding: 0 14px !important;
+          margin: 0 !important;
+          border: 1px solid #e0e0e0 !important;
+          border-radius: 999px !important;
+          background: #ffffff !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          scroll-snap-align: start !important;
+        }
+        #sidebar-hojas .sidebar-item.incompleta {
+          background: #fff3e0 !important;
+          border-color: #ffb74d !important;
+          color: #37474f !important;
+        }
+        #sidebar-hojas .sidebar-item.incompleta .icono-alerta {
+          color: #fb8c00 !important;
+        }
+        #sidebar-hojas .sidebar-item.active {
+          background: #08bb70 !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14) !important;
+          border-color: transparent !important;
+        }
+        #sidebar-hojas .sidebar-item.active i.material-icons {
+          color: #ffffff !important;
+        }
+        #sidebar-hojas .sidebar-item.incompleta.active .icono-alerta {
+          color: #ffd600 !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+        }
+        #sidebar-hojas .sidebar-item span {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: flex-start !important;
+          gap: 6px !important;
+          flex: 1 1 auto !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          font-size: 0.82rem !important;
+          line-height: 1 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          min-height: 46px !important;
+          transform: translateY(-1px) !important;
+        }
+        #sidebar-hojas .sidebar-item i.material-icons {
+          margin-right: 6px !important;
+          font-size: 1.2rem !important;
+          line-height: 1 !important;
+          color: #2f3f50 !important;
+          flex-shrink: 0 !important;
+        }
+        #sidebar-hojas .sidebar-item .icono-alerta {
+          margin-left: 6px !important;
+          color: #f57f17 !important;
+          font-size: 1rem !important;
+          line-height: 1 !important;
+          flex-shrink: 0 !important;
+          display: inline-flex !important;
+          opacity: 0 !important;
+          visibility: hidden !important;
+          transition:
+            opacity 0.15s ease,
+            visibility 0.15s ease;
+        }
+        #sidebar-hojas .sidebar-item.incompleta .icono-alerta {
+          opacity: 1 !important;
+          visibility: visible !important;
+        }
+
+        .contenedor-logo {
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
+          min-height: 36px !important;
+        }
+        .contenedor-logo img {
+          max-height: 36px !important;
+        }
+        .center-container {
+          min-height: auto !important;
+          margin-top: 0 !important;
+          margin-bottom: 6px !important;
+        }
+        #badge-hoja-activa {
+          line-height: 20px !important;
+          padding: 0 8px !important;
+          font-size: 0.75rem !important;
+        }
+      }
+
+      /* Estilos del modal de boletines unificados */
+      .btn-generar {
+        margin-top: 20px;
+        width: 100%;
+      }
+      #modal-boletines #loader {
+        display: none;
+        text-align: center;
+        margin-top: 15px;
+      }
+      #modal-boletines .boletines-progress {
+        display: none;
+        margin: 14px 0 4px;
+      }
+      #modal-boletines .boletines-progress-track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #e3eaf2;
+      }
+      #modal-boletines .boletines-progress-bar {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, #1565c0, #42a5f5);
+        transition: width 0.35s ease;
+      }
+      #modal-boletines .boletines-progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 6px;
+        color: #546e7a;
+        font-size: 0.82rem;
+      }
+
+      /* DISEÑO DE BOTÓN CERRAR SESIÓN */
+
+      #internet-status.online {
+        background: #e8f5e9;
+        color: #1b5e20;
+        border-color: #a5d6a7;
+      }
+      #internet-status.offline {
+        background: #ffebee;
+        color: #b71c1c;
+        border-color: #ef9a9a;
+      }
+      #internet-status i.material-icons {
+        font-size: 1rem !important;
+        line-height: 1 !important;
+      }
+      #btn-logout[style*="display: none"] {
+        display: none !important;
+      }
+      #btn-logout i.material-icons {
+        color: #ffffff !important;
+        font-size: 18px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1 !important;
+        display: inline-block !important;
+      }
+      #btn-logout span {
+        display: inline-block !important;
+        line-height: 1 !important;
+        font-weight: 500 !important;
+      }
+
+      /* Corrección para el contenedor del email (app.js fuerza display: block y rompe el flex) */
+      #user-email-display[style*="display: block"] {
+        display: flex !important;
+      }
+      #user-email-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 220px;
+      }
+
+      /* Corrección para el botón de cerrar sesión (app.js fuerza display: block y rompe el centrado flex) */
+      #btn-logout[style*="display: block"] {
+        display: flex !important;
+      }
+
+      /* --- Animación de Carga Institucional --- */
+      .logo-pulse-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        min-height: 150px;
+        padding-top: 12px;
+      }
+      .logo-pulse {
+        width: 92px;
+        height: 92px;
+        display: block;
+        animation: pulse-img 2.2s ease-in-out infinite;
+        filter: drop-shadow(0 10px 18px rgba(27, 80, 147, 0.18));
+      }
+      @keyframes pulse-img {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+          filter: drop-shadow(0 10px 18px rgba(27, 80, 147, 0.18));
+        }
+        50% {
+          transform: scale(1.08);
+          opacity: 0.95;
+          filter: drop-shadow(0 12px 24px rgba(27, 80, 147, 0.28));
+        }
+      }
+      .loader-texto-animado {
+        color: #1f4f87;
+        font-weight: 400;
+        margin: 0;
+        font-size: clamp(1rem, 1.8vw, 1.6rem);
+        letter-spacing: 0.04em;
+        text-align: center;
+        animation: pulse-text 2.2s ease-in-out infinite;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        line-height: 1.35;
+      }
+      @keyframes pulse-text {
+        0%,
+        100% {
+          opacity: 0.72;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+      @media (max-width: 600px) {
+        #btn-abrir-planilla-directo {
+          width: 40px !important;
+          min-width: 40px !important;
+          height: 40px !important;
+          min-height: 40px !important;
+          padding: 0 !important;
+          justify-content: center !important;
+        }
+        #btn-abrir-planilla-directo span {
+          display: none !important;
+        }
+        #btn-abrir-planilla-directo i.material-icons {
+          margin: 0 !important;
+        }
+        #btn-anterior,
+        #btn-siguiente,
+        #btn-guardar,
+        [id^="btn-ocultar-"],
+        #contenido-hojas .btn-pdf-icon {
+          min-height: 42px !important;
+          height: 42px !important;
+        }
+        #contenido-hojas .btn-pdf-icon {
+          width: 42px !important;
+          min-width: 42px !important;
+        }
+        /* Etiquetas de campos en carga de notas: una sola línea con elipsis para no pisar el input */
+        #contenido-hojas .input-field label {
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          max-width: calc(100% - 16px) !important;
+        }
+        /* Barra inferior fija en móvil para navegación rápida de alumnos y guardado */
+        #save-button-container {
+          position: sticky !important;
+          bottom: 0 !important;
+          z-index: 940 !important;
+          background: rgba(244, 244, 244, 0.96) !important;
+          backdrop-filter: blur(6px);
+          padding: 8px 4px !important;
+          margin: 12px -4px 0 !important;
+          border-top: 1px solid #e0e0e0;
+          box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+        }
+        #save-button-container .col {
+          padding: 0 3px !important;
+        }
+        #btn-anterior,
+        #btn-siguiente,
+        #btn-guardar {
+          padding: 0 6px !important;
+          font-size: 0.82rem !important;
+          border-radius: 10px !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          gap: 2px !important;
+        }
+        #btn-anterior i.material-icons.left,
+        #btn-guardar i.material-icons.left {
+          margin-right: 2px !important;
+          font-size: 1.1rem !important;
+        }
+        #btn-siguiente i.material-icons.right {
+          margin-left: 2px !important;
+          font-size: 1.1rem !important;
+        }
+        /* Login y Modales adaptados a pantallas móviles */
+        #section-login {
+          margin-top: 16px !important;
+          padding: 20px 16px !important;
+          border-radius: 14px !important;
+        }
+        .modal {
+          width: 95% !important;
+          max-height: 90vh !important;
+          border-radius: 12px !important;
+        }
+        .modal .modal-content {
+          padding: 16px 14px !important;
+        }
+      }
+      @media (max-width: 360px) {
+        #top-header-bar {
+          padding: 6px 8px !important;
+          gap: 4px !important;
+        }
+        #top-header-bar > div:first-child {
+          height: 36px !important;
+        }
+        #top-header-bar > div:first-child img {
+          width: 30px !important;
+          height: 30px !important;
+          max-height: 30px !important;
+        }
+        #top-header-bar #user-email-display {
+          display: none !important;
+        }
+      }
+    
+      /* --- Modal Gestor de Permisos (Optimizado para Escritorio y Distribución Espaciosa) --- */
+      #modal-permisos-usuarios.modal {
+        width: 96% !important;
+        max-width: 1420px !important;
+        height: 92vh !important;
+        max-height: 92vh !important;
+        top: 4% !important;
+        border-radius: 14px !important;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3) !important;
+      }
+      #modal-permisos-usuarios.modal.modal-fixed-footer .modal-content {
+        height: calc(100% - 64px) !important;
+        max-height: calc(100% - 64px) !important;
+        padding: 18px 26px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow-y: auto !important;
+      }
+      #modal-permisos-usuarios .chk-pill-label {
+        cursor: pointer;
+        background: #ffffff;
+        border: 1px solid #d1c4e9;
+        border-radius: 6px;
+        padding: 5px 10px;
+        display: inline-flex;
+        align-items: center;
+        margin: 2px 0;
+        transition: all 0.15s ease-in-out;
+      }
+      #modal-permisos-usuarios .chk-pill-label:hover {
+        background: #ede7f6;
+        border-color: #7e57c2;
+      }
+      #modal-permisos-usuarios .chk-pill-label input[type="checkbox"]:checked + span {
+        font-weight: 600;
+        color: #4a148c;
+      }
+
+      /* --- Modal Buscador General de Alumnos (Exclusivo Administrador) --- */
+      #modal-buscador-alumnos.modal {
+        width: 96% !important;
+        max-width: 1320px !important;
+        height: 92vh !important;
+        max-height: 92vh !important;
+        top: 4% !important;
+        border-radius: 14px !important;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28) !important;
+      }
+      #modal-buscador-alumnos.modal.modal-fixed-footer .modal-content {
+        height: calc(100% - 62px) !important;
+        max-height: calc(100% - 62px) !important;
+        padding: 18px 24px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+      .buscador-alumno-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #0284c7;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        transition: box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+      .buscador-alumno-card:hover {
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+        border-color: #bae6fd;
+        border-left-color: #0369a1;
+      }
+      .buscador-datos-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 10px 14px;
+        margin-top: 10px;
+      }
+      .buscador-dato-item {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 7px 11px;
+      }
+      .buscador-dato-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        display: block;
+        margin-bottom: 2px;
+      }
+      .buscador-dato-valor {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #0f172a;
+        word-break: break-word;
+      }
+      @media (max-width: 600px) {
+        #modal-buscador-alumnos.modal.modal-fixed-footer .modal-content {
+          padding: 12px 12px !important;
+          overflow-y: auto !important;
+        }
+        .buscador-datos-grid {
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+        }
+      }
+
+      /* --- Modal Historial y Restauración de Alumno (Opción A - Exclusivo Admin) --- */
+      #modal-historial-alumno.modal {
+        width: 96% !important;
+        max-width: 1180px !important;
+        height: 92vh !important;
+        max-height: 92vh !important;
+        top: 4% !important;
+        border-radius: 14px !important;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28) !important;
+      }
+      #modal-historial-alumno.modal.modal-fixed-footer .modal-content {
+        height: calc(100% - 62px) !important;
+        max-height: calc(100% - 62px) !important;
+        padding: 18px 24px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+      }
+      .historial-timeline-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 5px solid #5e35b1;
+        border-radius: 12px;
+        padding: 14px 18px;
+        margin-bottom: 12px;
+        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+        transition: box-shadow 0.18s ease, border-color 0.18s ease;
+      }
+      .historial-timeline-card:hover {
+        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+      }
+      .historial-timeline-card.es-restauracion {
+        border-left-color: #00897b;
+        background: #fafdfb;
+      }
+      .historial-diff-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        margin-bottom: 6px;
+      }
+      .historial-val-viejo {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: #fee2e2;
+        color: #991b1b;
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 0.86rem;
+        border: 1px solid #fecaca;
+      }
+      .historial-val-nuevo {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: #dcfce7;
+        color: #166534;
+        font-family: monospace;
+        font-weight: 700;
+        font-size: 0.86rem;
+        border: 1px solid #bbf7d0;
+      }
+      @media (max-width: 600px) {
+        #modal-historial-alumno.modal.modal-fixed-footer .modal-content {
+          padding: 12px 12px !important;
+          overflow-y: auto !important;
+        }
+        #btn-historial-alumno-actual span,
+        #btn-agregar-alumno-grado span {
+          display: none;
+        }
+      }
+
+      /* --- Modal Agregar Alumno al Grado (Docentes y Administradores) --- */
+      #modal-agregar-alumno-grado.modal {
+        width: 96% !important;
+        max-width: 1020px !important;
+        height: 92vh !important;
+        max-height: 92vh !important;
+        top: 4% !important;
+        border-radius: 14px !important;
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28) !important;
+        overflow: hidden !important;
+      }
+      #modal-agregar-alumno-grado #form-agregar-alumno-grado {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-height: 92vh;
+        margin: 0;
+      }
+      #modal-agregar-alumno-grado .modal-content {
+        padding: 18px 24px 14px 24px !important;
+        flex: 1 1 auto;
+        overflow-y: auto !important;
+        min-height: 0;
+      }
+      #modal-agregar-alumno-grado .modal-footer {
+        flex-shrink: 0;
+        height: auto !important;
+      }
+      .seccion-ficha-nuevo-alumno {
+        border: 1px solid #cbd5e1;
+        border-radius: 12px;
+        padding: 12px 16px 6px 16px;
+        margin: 0 0 16px 0;
+        background: #ffffff;
+      }
+      .seccion-ficha-nuevo-alumno > legend {
+        font-size: 0.86rem;
+        font-weight: 700;
+        color: #0f172a;
+        padding: 3px 12px;
+        border-radius: 999px;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-prog-a {
+        border-color: #bae6fd;
+        background: #f8fcff;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-prog-a > legend {
+        background: #e0f2fe;
+        color: #0369a1;
+        border-color: #7dd3fc;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-prog-b {
+        border-color: #c7d2fe;
+        background: #f8faff;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-prog-b > legend {
+        background: #e0e7ff;
+        color: #3730a3;
+        border-color: #a5b4fc;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-auxiliar {
+        border-color: #bbf7d0;
+        background: #f7fee7;
+      }
+      .seccion-ficha-nuevo-alumno.seccion-auxiliar > legend {
+        background: #dcfce7;
+        color: #166534;
+        border-color: #86efac;
+      }
+      .campo-form-nuevo-alumno {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.25rem;
+        margin-bottom: 12px;
+      }
+      .campo-form-nuevo-alumno > label {
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        color: #1e293b !important;
+        position: static !important;
+        transform: none !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        line-height: 1.3 !important;
+      }
+      .input-nuevo-alumno-box {
+        font: inherit !important;
+        font-size: max(1rem, 1em) !important;
+        min-height: 42px !important;
+        height: 42px !important;
+        padding: 0 12px !important;
+        border: 1px solid #64748b !important;
+        border-radius: 8px !important;
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        box-sizing: border-box !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+      }
+      .input-nuevo-alumno-box:focus-visible {
+        outline: 3px solid #0b57d0 !important;
+        outline-offset: 2px !important;
+        border-color: #0b57d0 !important;
+      }
+      .input-nuevo-alumno-box[aria-invalid="true"],
+      .input-nuevo-alumno-box:user-invalid {
+        border-color: #b91c1c !important;
+        background-color: #fef2f2 !important;
+      }
+      .input-nuevo-alumno-box::-webkit-search-cancel-button {
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .ayuda-campo-nuevo-alumno {
+        font-size: 0.73rem;
+        color: #475569;
+        line-height: 1.3;
+      }
+      .error-campo-nuevo-alumno {
+        font-size: 0.75rem;
+        color: #b91c1c;
+        font-weight: 600;
+        display: none;
+        align-items: center;
+        gap: 4px;
+      }
+      .fieldset-sexo-nuevo-alumno {
+        border: 1px solid #94a3b8;
+        border-radius: 8px;
+        padding: 6px 12px 8px 12px;
+        margin: 0 0 12px 0;
+        background: #f8fafc;
+      }
+      .fieldset-sexo-nuevo-alumno legend {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #1e293b;
+        padding: 0 6px;
+      }
+      .radio-sexo-opcion {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-right: 18px;
+        min-height: 40px;
+        cursor: pointer;
+      }
+      .radio-sexo-opcion input[type="radio"] {
+        position: static !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        width: 18px;
+        height: 18px;
+        accent-color: #1565c0;
+        margin: 0;
+      }
+      .radio-sexo-opcion label {
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        color: #0f172a !important;
+        cursor: pointer;
+        padding: 6px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="top-header-bar"
+      style="
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background-color: #ffffff;
+        padding: 10px 24px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        width: 100%;
+        box-sizing: border-box;
+        border-bottom: 1px solid #f0f0f0;
+      "
+    >
+      <!-- Logo Izquierda -->
+      <div style="display: flex; align-items: center; flex-shrink: 0; height: 52px;">
+        <img
+          src="escudo misericordia (2) (3).png"
+          alt="Escuela de la Misericordia"
+          style="display: block; width: 46px; height: 46px; object-fit: contain; border-radius: 50%; background: transparent;"
+        />
+      </div>
+
+      <!-- Controles Derecha -->
+      <div style="display: flex; align-items: center; gap: 24px">
+        <!-- Menú Superior de Opciones (Transformación de Barra de Botones en Menú) -->
+        <div id="contenedor-boton-admin" style="display: none; align-items: center; position: relative;">
+          <button
+            id="btn-menu-acciones-trigger"
+            class="dropdown-trigger menu-principal-btn waves-effect waves-light"
+            data-target="dropdown-menu-acciones"
+            type="button"
+            title="Abrir menú de herramientas y opciones"
+            aria-haspopup="true"
+            aria-expanded="false"
+          >
+            <i class="material-icons left">menu_open</i>
+            <span class="menu-trigger-label">Menú de Opciones</span>
+            <i class="material-icons right">arrow_drop_down</i>
+          </button>
+
+          <!-- Dropdown con las Opciones de Menú -->
+          <ul id="dropdown-menu-acciones" class="dropdown-content modern-menu-dropdown">
+            <li class="menu-header-item">
+              <span>Herramientas del Sistema</span>
+            </li>
+            <li id="item-menu-buscador-alumnos" style="display: none;">
+              <a id="btn-abrir-buscador-alumnos" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="window.abrirBuscadorAlumnos && window.abrirBuscadorAlumnos()">
+                <span class="menu-item-icon-circle icon-buscador-alumnos">
+                  <i class="material-icons">person_search</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Buscador de Alumnos</span>
+                  <span class="menu-item-desc">Buscar por DNI, grado, apellido o nombre</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-auditoria">
+              <a id="btn-auditoria-global" href="javascript:void(0)" class="menu-item-link waves-effect">
+                <span class="menu-item-icon-circle icon-auditoria">
+                  <i class="material-icons">admin_panel_settings</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Panel de Auditoría Global</span>
+                  <span class="menu-item-desc">Supervisión y control de actividad</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-boletines">
+              <a id="btn-abrir-boletines" href="javascript:void(0)" class="menu-item-link waves-effect">
+                <span class="menu-item-icon-circle icon-boletines">
+                  <i class="material-icons">description</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Generar Boletines</span>
+                  <span class="menu-item-desc">Emisión oficial de boletines en PDF</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-migracion">
+              <a id="btn-abrir-migracion" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="window.abrirModuloPaseGrado && window.abrirModuloPaseGrado('cuatrimestre')">
+                <span class="menu-item-icon-circle icon-migracion">
+                  <i class="material-icons">sync_alt</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Migrar a 2do Cuatrimestre</span>
+                  <span class="menu-item-desc">Traspaso de datos y matrículas</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-pase-grado">
+              <a id="btn-abrir-pase-grado" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="window.abrirModuloPaseGrado && window.abrirModuloPaseGrado('pase-grado')">
+                <span class="menu-item-icon-circle icon-pase-grado">
+                  <i class="material-icons">school</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Pase de Grado Anual</span>
+                  <span class="menu-item-desc">Promoción, repitencia y atraso</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-sync-sheets">
+              <a id="btn-abrir-sync-sheets" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="window.abrirModuloPaseGrado && window.abrirModuloPaseGrado('sync-sheets')">
+                <span class="menu-item-icon-circle" style="background:#e0f2f1; color:#00796b;">
+                  <i class="material-icons">cloud_sync</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Sincronización Sheets</span>
+                  <span class="menu-item-desc">Tiempo real y corte a producción</span>
+                </div>
+              </a>
+            </li>
+            <li class="divider" tabindex="-1"></li>
+            <li id="item-menu-permisos">
+              <a id="btn-abrir-permisos" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="window.abrirModalPermisosDocentes && window.abrirModalPermisosDocentes()">
+                <span class="menu-item-icon-circle" style="background:#ede7f6; color:#512da8;">
+                  <i class="material-icons">manage_accounts</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Permisos y Áreas</span>
+                  <span class="menu-item-desc">Asignar grados y áreas editables</span>
+                </div>
+              </a>
+            </li>
+            <li id="item-menu-promocion">
+              <a id="btn-abrir-promocion" href="javascript:void(0)" class="menu-item-link waves-effect" onclick="abrirPdfPlanillaPromocion()">
+                <span class="menu-item-icon-circle icon-promocion">
+                  <i class="material-icons">assignment_turned_in</i>
+                </span>
+                <div class="menu-item-info">
+                  <span class="menu-item-name">Planilla de Promoción</span>
+                  <span class="menu-item-desc">Planilla ministerial anual consolidada</span>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Divisor vertical -->
+        <div
+          style="width: 1px; height: 32px; background-color: #e0e0e0; margin: 0"
+        ></div>
+
+        <!-- Info y estado usuario (Modernizado) -->
+        <div
+          style="display: flex; align-items: center; gap: 16px; flex-shrink: 0"
+        >
+          <!-- Módulo de Email -->
+          <div
+            id="user-email-display"
+            style="
+              display: none;
+              color: #37474f;
+              align-items: center;
+              font-weight: 500;
+              font-size: 0.95rem;
+              margin: 0;
+              background: #f8f9fa;
+              padding: 4px 16px 4px 4px;
+              border-radius: 30px;
+              border: 1px solid #e0e0e0;
+              box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02);
+            "
+          >
+            <div
+              style="
+                width: 32px;
+                height: 32px;
+                background: #e3f2fd;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin-right: 10px;
+                color: #1565c0;
+                border: 1px solid #bbdefb;
+              "
+            >
+              <i class="material-icons" style="font-size: 1.2rem; margin: 0"
+                >person</i
+              >
+            </div>
+            <span
+              id="user-email-text"
+              style="vertical-align: middle; letter-spacing: 0.2px"
+            ></span>
+          </div>
+
+          <!-- Estado Wi-Fi -->
+          <div
+            id="internet-status"
+            class="online"
+            title="Estado de conexión"
+            style="
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 40px;
+              height: 40px;
+              border-radius: 50%;
+              background: #e8f5e9;
+              color: #2e7d32;
+              border: none;
+              margin: 0;
+              box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+              transition: all 0.3s ease;
+            "
+          >
+            <i
+              class="material-icons"
+              style="font-size: 1.3rem; line-height: 1; margin: 0"
+              >wifi</i
+            >
+            <span id="internet-status-text" style="display: none"
+              >Conectado</span
+            >
+          </div>
+
+          <!-- Botón Salir (Minimalista) -->
+          <a
+            id="btn-logout"
+            class="waves-effect"
+            style="
+              display: none;
+              background-color: #ff9800 !important;
+              width: 40px;
+              height: 40px;
+              border-radius: 8px;
+              box-shadow: 0 2px 6px rgba(255, 152, 0, 0.4) !important;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+              margin: 0;
+              border: none;
+              transition: all 0.2s ease;
+              text-decoration: none;
+            "
+            title="Cerrar Sesión"
+          >
+            <i
+              class="material-icons"
+              style="
+                color: #ffffff;
+                font-size: 1.4rem;
+                line-height: 1;
+                margin: 0;
+              "
+              >logout</i
+            >
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="row form-card" id="section-login" style="display: none">
+      <div class="col s12 center-align">
+        <p style="color: #1565c0; font-weight: 500">
+          Autenticación segura: Identifica tu cuenta para recibir un código de
+          acceso.
+        </p>
+      </div>
+      <div id="paso-correo">
+        <div class="input-field col s12 m8">
+          <i class="material-icons prefix">mail</i>
+          <input
+            id="email-profesor"
+            type="email"
+            class="validate"
+            placeholder="ejemplo@gmail.com"
+          />
+          <label for="email-profesor" class="active"
+            >Tu correo electrónico</label
+          >
+        </div>
+        <div
+          class="col s12 m4"
+          style="
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          "
+        >
+          <button
+            id="btn-enviar-codigo"
+            class="waves-effect waves-light btn blue darken-3"
+            style="width: 100%"
+          >
+            <i class="material-icons left">send</i>Enviar Código
+          </button>
+          <button
+            id="btn-tengo-clave"
+            class="waves-effect waves-light btn grey darken-2"
+            style="width: 100%"
+          >
+            <i class="material-icons left">keyboard</i>Ya tengo mi clave
+          </button>
+        </div>
+      </div>
+      <div id="paso-codigo" style="display: none">
+        <div class="input-field col s12 m8">
+          <i class="material-icons prefix">vpn_key</i>
+          <input
+            id="codigo-otp"
+            type="text"
+            maxlength="6"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6)"
+            placeholder="123456"
+            autocomplete="off"
+          />
+          <label for="codigo-otp" class="active"
+            >Código de 6 dígitos</label
+          >
+        </div>
+        <div class="col s12 m4" style="margin-top: 15px">
+          <button
+            id="btn-verificar-codigo"
+            class="waves-effect waves-light btn green darken-1"
+            style="width: 100%"
+          >
+            <i class="material-icons left">verified_user</i>Verificar Código
+          </button>
+        </div>
+        <div class="col s12 center-align" style="margin-top: 10px">
+          <a
+            href="#"
+            id="btn-volver-correo"
+            style="color: #d32f2f; cursor: pointer"
+            >← Escribí mal mi correo</a
+          >
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="row form-card"
+      id="section-selectors"
+      style="display: none; margin-top: 10px"
+    >
+      <div class="col s12" style="padding: 0;">
+        <div class="selectors-flex-row">
+          <div class="selector-block-planilla">
+            <div class="input-field">
+              <i id="lupa-buscador" class="material-icons prefix" aria-hidden="true">search</i>
+              <input
+                type="text"
+                id="select-planilla"
+                class="autocomplete"
+                placeholder="Escribe para buscar planilla..."
+                disabled
+                autocomplete="off"
+              />
+              <label for="select-planilla" class="active">1. Seleccionar Planilla</label>
+            </div>
+            <div class="planilla-actions-toolbar">
+              <a
+                id="btn-abrir-planilla-directo"
+                href="#"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abrir planilla seleccionada en Google Sheets"
+                aria-label="Abrir planilla seleccionada en Google Sheets"
+                style="
+                  display: none;
+                  width: 38px;
+                  height: 38px;
+                  min-width: 38px;
+                  border-radius: 10px;
+                  background: #0d47a1;
+                  color: #fff;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 3px 10px rgba(13, 71, 161, 0.25);
+                  text-decoration: none;
+                "
+              >
+                <i class="material-icons" aria-hidden="true" style="font-size: 1.2rem; line-height: 1; margin: 0">open_in_new</i>
+              </a>
+              <button
+                type="button"
+                id="btn-sync-planilla-actual"
+                onclick="if (typeof window.sincronizarPlanillaActualRapido === 'function') window.sincronizarPlanillaActualRapido();"
+                title="Sincronizar notas de esta planilla desde Google Sheets"
+                aria-label="Sincronizar notas de esta planilla desde Google Sheets"
+                style="
+                  display: none;
+                  width: 38px;
+                  height: 38px;
+                  min-width: 38px;
+                  border-radius: 10px;
+                  background: #00796b;
+                  color: #fff;
+                  border: none;
+                  cursor: pointer;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 3px 10px rgba(0, 121, 107, 0.25);
+                  padding: 0;
+                "
+              >
+                <i class="material-icons" aria-hidden="true" style="font-size: 1.2rem; line-height: 1; margin: 0">cloud_sync</i>
+              </button>
+            </div>
+          </div>
+          <div class="input-field" style="display: none">
+            <select id="select-hoja" disabled>
+              <option value="" disabled selected>Seleccione una Hoja</option>
+            </select>
+          </div>
+          <div class="selector-block-alumno">
+            <div class="input-field">
+              <select id="select-alumno" disabled>
+                <option value="" disabled selected>Seleccione un Alumno</option>
+              </select>
+              <label>2. Seleccionar Alumno</label>
+            </div>
+            <div class="alumno-actions-toolbar">
+              <button
+                type="button"
+                id="btn-agregar-alumno-grado"
+                onclick="if (typeof window.abrirModalAgregarAlumnoGrado === 'function') window.abrirModalAgregarAlumnoGrado();"
+                title="Agregar un nuevo alumno a este grado"
+                aria-label="Agregar un nuevo alumno a este grado"
+                style="
+                  display: none;
+                  width: 38px;
+                  height: 38px;
+                  min-width: 38px;
+                  padding: 0;
+                  border-radius: 10px;
+                  background: linear-gradient(135deg, #15803d 0%, #16a34a 100%);
+                  color: #fff;
+                  border: none;
+                  cursor: pointer;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.28);
+                "
+              >
+                <i class="material-icons" aria-hidden="true" style="font-size: 1.2rem; line-height: 1; margin: 0">person_add</i>
+              </button>
+              <button
+                type="button"
+                id="btn-historial-alumno-actual"
+                onclick="if (typeof window.abrirHistorialAlumnoActual === 'function') window.abrirHistorialAlumnoActual();"
+                title="Ver historial por fechas y restaurar notas o datos anteriores de este alumno"
+                aria-label="Ver historial por fechas y restaurar notas o datos anteriores de este alumno"
+                style="
+                  display: none;
+                  width: 38px;
+                  height: 38px;
+                  min-width: 38px;
+                  padding: 0;
+                  border-radius: 10px;
+                  background: linear-gradient(135deg, #4527a0 0%, #5e35b1 100%);
+                  color: #fff;
+                  border: none;
+                  cursor: pointer;
+                  align-items: center;
+                  justify-content: center;
+                  box-shadow: 0 3px 10px rgba(94, 53, 177, 0.28);
+                "
+              >
+                <i class="material-icons" aria-hidden="true" style="font-size: 1.2rem; line-height: 1; margin: 0">history</i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="loader"
+      class="loader-container"
+      style="display: none; padding-top: 48px; padding-bottom: 20px; margin-top: 0;"
+    >
+      <div class="logo-pulse-container">
+        <img
+          src="escudo misericordia (2) (3).png"
+          alt="Cargando información institucional"
+          class="logo-pulse"
+          style="width: 120px; height: 120px; display: block; margin: 0 auto; object-fit: contain; background: transparent;"
+        />
+        <p id="loader-text" class="loader-texto-animado">
+          Sincronizando información...
+        </p>
+      </div>
+    </div>
+
+    <div
+      id="panel-auditoria-global"
+      class="row form-card"
+      style="display: none; position: relative; margin-top: 20px"
+    >
+      <button
+        id="btn-cerrar-auditoria"
+        class="btn-floating red darken-2 waves-effect waves-light"
+        style="position: absolute; top: -15px; right: -15px; z-index: 10"
+        title="Cerrar Panel"
+      >
+        <i class="material-icons">close</i>
+      </button>
+      <div id="render-auditoria" class="col s12"></div>
+    </div>
+
+    <div
+      id="panel-principal"
+      class="row"
+      style="display: none; margin-top: 20px"
+    >
+      <div class="col s12 m4 l3">
+        <div
+          id="sidebar-hojas"
+          class="collection"
+          style="
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+          "
+        ></div>
+      </div>
+      <div class="col s12 m8 l9">
+        <div
+          id="contenido-hojas"
+          class="card-panel"
+          style="
+            border-radius: 16px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+            padding: 25px;
+            min-height: 0;
+            margin-top: 0;
+          "
+        ></div>
+        <div
+          class="row"
+          id="save-button-container"
+          style="display: none; margin-top: 20px"
+        >
+          <div class="col s4 left-align">
+            <button
+              id="btn-anterior"
+              class="waves-effect waves-light btn blue darken-2"
+              style="width: 100%"
+            >
+              <i class="material-icons left">arrow_back</i>Ant.
+            </button>
+          </div>
+          <div class="col s4 center-align">
+            <button
+              id="btn-siguiente"
+              class="waves-effect waves-light btn blue darken-2"
+              style="width: 100%"
+            >
+              Sig.<i class="material-icons right">arrow_forward</i>
+            </button>
+          </div>
+          <div class="col s4 right-align">
+            <button
+              id="btn-guardar"
+              class="waves-effect waves-light btn green darken-1"
+              style="width: 100%"
+            >
+              <i class="material-icons left">save</i>Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="modal-dashboard"
+      class="modal"
+      style="max-width: 1160px; width: 95%; border-radius: 12px"
+    >
+      <div class="modal-content" style="min-height: 720px">
+        <div
+          style="
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+          "
+        >
+          <div>
+            <h4 style="color: #1565c0; font-weight: bold; margin: 0">
+              Resumen del Grado
+            </h4>
+            <p style="margin: 4px 0 0 0; color: #616161">
+              Reporte de desempeño y alumnos destacados
+            </p>
+          </div>
+          <a
+            class="modal-close btn-flat"
+            style="color: #d32f2f; font-weight: bold"
+          >
+            <i class="material-icons">close</i>
+          </a>
+        </div>
+        <div class="row" style="margin-bottom: 0">
+          <div class="col s12 m4">
+            <div class="card-panel blue lighten-5" style="padding: 18px">
+              <div style="color: #1565c0; font-weight: 700; margin-bottom: 8px">
+                Total Alumnos Evaluados
+              </div>
+              <div
+                id="kpi-total-alumnos"
+                style="font-size: 2.4rem; font-weight: 700; color: #0d47a1"
+              >
+                0
+              </div>
+            </div>
+          </div>
+          <div class="col s12 m4">
+            <div class="card-panel red lighten-5" style="padding: 18px">
+              <div style="color: #c62828; font-weight: 700; margin-bottom: 8px">
+                Materia Crítica (> Desaprobados)
+              </div>
+              <div
+                id="kpi-materia-critica"
+                style="font-size: 1.5rem; font-weight: 700; color: #b71c1c"
+              >
+                -
+              </div>
+            </div>
+          </div>
+          <div class="col s12 m4">
+            <div class="card-panel orange lighten-5" style="padding: 18px">
+              <div style="color: #ef6c00; font-weight: 700; margin-bottom: 8px">
+                Desaprobado General
+              </div>
+              <div
+                id="kpi-desaprobado-general"
+                style="font-size: 2.2rem; font-weight: 700; color: #e65100"
+              >
+                0%
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          id="chart_aprobados_materias"
+          style="min-height: 440px; margin-top: 8px"
+        ></div>
+        <div class="row" style="margin-top: 20px">
+          <div class="col s12 m6">
+            <div class="card-panel" style="padding: 18px">
+              <h6 style="margin-top: 0; font-weight: 700; color: #1565c0">
+                Cuadro de Honor
+              </h6>
+              <table class="striped highlight" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th style="font-weight: 700">Puesto</th>
+                    <th style="font-weight: 700">Alumno</th>
+                    <th style="font-weight: 700">Promedio</th>
+                    <th style="font-weight: 700">Faltas</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-top10">
+                  <tr>
+                    <td colspan="4" class="center-align grey-text">
+                      Cargando cuadro de honor...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="col s12 m6">
+            <div class="card-panel" style="padding: 18px">
+              <h6 style="margin-top: 0; font-weight: 700; color: #1565c0">
+                Alumnos con materias desaprobadas
+              </h6>
+              <table class="striped highlight" style="width: 100%">
+                <thead>
+                  <tr>
+                    <th style="font-weight: 700">Alumno</th>
+                    <th style="font-weight: 700">Materia</th>
+                    <th style="font-weight: 700">Nota</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-desaprobados">
+                  <tr>
+                    <td colspan="3" class="center-align grey-text">
+                      Calculando datos...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="modal-orientacion"
+      class="modal"
+      style="max-width: 320px; border-radius: 8px"
+    >
+      <div class="modal-content center-align">
+        <h5 style="color: #1565c0; font-weight: bold; margin-bottom: 5px">
+          Formato del PDF
+        </h5>
+        <p style="color: #666; margin-top: 0; font-size: 0.95rem">
+          Configura la página para imprimir:
+        </p>
+        <div
+          style="
+            margin-top: 20px;
+            text-align: left;
+            background: #f5f5f5;
+            padding: 10px 15px;
+            border-radius: 6px;
+          "
+        >
+          <p style="margin: 0 0 5px 0">
+            <label
+              ><input
+                name="opcion-tamano-papel"
+                type="radio"
+                value="LEGAL"
+                checked
+              /><span>Oficio / Legal (Autor)</span></label
+            >
+          </p>
+          <p style="margin: 0">
+            <label
+              ><input name="opcion-tamano-papel" type="radio" value="A4" /><span
+                >A4 (Estándar)</span
+              ></label
+            >
+          </p>
+        </div>
+        <div
+          style="
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+          "
+        >
+          <button
+            class="waves-effect waves-light btn-flat blue-text text-darken-2"
+            onclick="confirmarDescargaPdf('vertical')"
+          >
+            Vertical
+          </button>
+          <button
+            class="waves-effect waves-light btn-flat red-text text-darken-3"
+            onclick="confirmarDescargaPdf('horizontal')"
+          >
+            Horizontal
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="modal-advertencia-notas"
+      class="modal"
+      style="border-radius: 8px; max-width: 420px"
+    >
+      <div class="modal-content">
+        <h6 style="color: #d32f2f; font-weight: bold">
+          <i class="material-icons">warning</i> Notas en blanco detectadas
+        </h6>
+        <ul id="lista-alumnos-incompletos"></ul>
+        <p id="texto-otros-alumnos" style="display: none">
+          (y posiblemente otros...)
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="modal-close waves-effect waves-light btn-flat">
+          Cancelar
+        </button>
+        <button
+          class="waves-effect waves-light btn red darken-2"
+          onclick="continuarAPdfConAdvertencia()"
+        >
+          Generar igual
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="modal-boletines"
+      class="modal"
+      style="
+        border-radius: 8px;
+        max-width: 480px;
+        padding: 16px;
+        max-height: calc(100vh - 80px);
+        overflow-y: auto;
+      "
+    >
+      <h5
+        style="
+          color: #1565c0;
+          font-weight: bold;
+          margin-bottom: 16px;
+          font-size: 1.1rem;
+        "
+      >
+        <i class="material-icons left">picture_as_pdf</i>Generador de Boletines
+      </h5>
+
+      <div class="row" style="margin-bottom: 4px">
+        <div class="input-field col s12" style="margin-bottom: 8px">
+          <select id="select-cuatri">
+            <option value="1º Cuat." selected>1º Cuatrimestre</option>
+            <option value="2º Cuat.">2º Cuatrimestre</option>
+          </select>
+          <label>Cuatrimestre / Etapa</label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom: 4px">
+        <div class="input-field col s6" style="margin-bottom: 8px">
+          <select id="input-grado">
+            <option value="" disabled selected>Selecciona un grado</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+          <label for="input-grado">Grado</label>
+        </div>
+
+        <div class="input-field col s6" style="margin-bottom: 8px">
+          <select id="input-seccion">
+            <option value="" disabled selected>Selecciona una sección</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+            <option value="E">E</option>
+            <option value="F">F</option>
+            <option value="G">G</option>
+            <option value="H">H</option>
+            <option value="I">I</option>
+            <option value="J">J</option>
+            <option value="K">K</option>
+            <option value="L">L</option>
+          </select>
+          <label for="input-seccion">División / Sección</label>
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom: 8px">
+        <div class="input-field col s12" style="margin-bottom: 0">
+          <input
+            id="input-dni"
+            type="text"
+            placeholder="Ej: 12345678"
+            style="margin-bottom: 0"
+          />
+          <label for="input-dni" class="active"
+            >DNI del Alumno (opcional)</label
+          >
+        </div>
+      </div>
+
+      <div class="row" style="margin-bottom: 12px">
+        <div class="input-field col s12" style="margin-bottom: 0">
+          <select id="select-formato-boletin">
+            <option value="sobreimpresion" selected>🖨️ Sobreimpresión A4 (Rellena casillas vacías sobre hoja del 1º Cuat.)</option>
+            <option value="oficial_hoja">📄 Libreta Oficial A4 (Grilla ministerial con materias y notas)</option>
+            <option value="oficial_diptico">📑 Libreta Completa A4 (Díptico frente y dorso con carátula y exámenes)</option>
+          </select>
+          <label>Formato de Salida / Impresión</label>
+        </div>
+      </div>
+
+      <button
+        id="btn-iniciar"
+        class="waves-effect waves-light btn blue darken-3 btn-generar"
+        onclick="iniciarGeneracion()"
+        style="width: 100%; margin-bottom: 10px"
+      >
+        <i class="material-icons left">play_arrow</i>Generar Boletines
+      </button>
+
+      <button
+        id="btn-borrar"
+        class="waves-effect waves-light btn red darken-4 btn-generar"
+        onclick="confirmarBorrado()"
+        style="width: 100%"
+      >
+        <i class="material-icons left">delete_forever</i>Borrar Boletines
+      </button>
+      <button
+        id="btn-cancelar-boletines"
+        class="waves-effect waves-light btn grey darken-3"
+        onclick="cancelarProcesoBoletinesUI()"
+        style="display: none; width: 100%; margin-top: 10px"
+      >
+        <i class="material-icons left">cancel</i>Cancelar proceso
+      </button>
+
+      <div
+        id="loader-boletines"
+        style="display: none; text-align: center; margin-top: 15px"
+      >
+        <p
+          id="status-text"
+          style="color: #1565c0; font-weight: bold; margin-top: 10px"
+        >
+          Conectando al servidor...
+        </p>
+      </div>
+      <div id="boletines-progress" class="boletines-progress" aria-live="polite">
+        <div class="boletines-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div id="boletines-progress-bar" class="boletines-progress-bar"></div>
+        </div>
+        <div class="boletines-progress-label">
+          <span id="boletines-progress-status">Preparando generación...</span>
+          <strong id="boletines-progress-percent">0%</strong>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function actualizarEstadoInternet() {
+        const indicador = document.getElementById("internet-status");
+        const texto = document.getElementById("internet-status-text");
+
+        const estaOnline = navigator.onLine;
+
+        if (indicador) {
+          indicador.classList.toggle("online", estaOnline);
+          indicador.classList.toggle("offline", !estaOnline);
+          const icono = indicador.querySelector("i");
+          if (icono) icono.textContent = estaOnline ? "wifi" : "wifi_off";
+        }
+        if (texto) {
+          texto.textContent = estaOnline ? "Conectado" : "Sin conexión";
+        }
+      }
+
+      window.addEventListener("online", actualizarEstadoInternet);
+      window.addEventListener("offline", actualizarEstadoInternet);
+      document.addEventListener("DOMContentLoaded", actualizarEstadoInternet);
+    </script>
+    <!-- COMPRESIÓN DE CACHÉ PARA EVITAR QUOTAEXCEEDED -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <!-- MOTOR DE PDF EN CLIENTE Y EMPAQUETADOR ZIP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <!-- SDK de Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="config_materias_especiales.js"></script>
+    <script src="app.js?v=20261110-buscador-excel-print"></script>
+  
+    <!-- ================================================================ -->
+    <!-- MODAL GESTOR DE PERMISOS DE USUARIOS Y ÁREAS (ADMIN)            -->
+    <!-- ================================================================ -->
+    <div id="modal-permisos-usuarios" class="modal modal-fixed-footer" style="border-radius: 14px;">
+      <div class="modal-content">
+        <!-- Encabezado con Título y Cerrar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #512da8; padding-bottom: 10px; margin-bottom: 12px; flex-shrink: 0;">
+          <div>
+            <h5 style="color: #512da8; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.3rem;">
+              <i class="material-icons">manage_accounts</i> Gestor de Permisos y Áreas por Docente
+            </h5>
+            <p style="color: #616161; font-size: 12.5px; margin: 2px 0 0 0;">
+              Asigna qué grados puede ver el docente y personaliza individualmente el acceso a Datos y las áreas curriculares en cada grado.
+            </p>
+          </div>
+          <button class="modal-close btn-flat waves-effect" style="color: #757575;"><i class="material-icons">close</i></button>
+        </div>
+
+        <!-- 1. Selector de Docente y Badge (En una sola línea limpia) -->
+        <div class="row" style="margin-bottom: 10px; align-items: center; flex-shrink: 0;">
+          <div class="col s12 m8 l9">
+            <label for="select-docente-permisos" style="font-weight: bold; color: #37474f; font-size: 13px;">1. Selecciona el Docente o Usuario a Configurar:</label>
+            <select id="select-docente-permisos" class="browser-default" style="width: 100%; border: 1px solid #b0bec5; border-radius: 8px; padding: 8px 12px; margin-top: 4px; font-size: 14px; background: #fff;" onchange="window.cargarDocenteEnGestorPermisos(this.value)">
+              <option value="" disabled selected>-- Elige un docente --</option>
+            </select>
+          </div>
+          <div class="col s12 m4 l3" style="margin-top: 18px;">
+            <div id="badge-tipo-usuario" style="display: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 12px;"></div>
+          </div>
+        </div>
+
+        <div id="contenedor-edicion-permisos" style="display: none; flex-direction: column; flex: 1; min-height: 0;">
+          <!-- 2. Asignación Rápida Masiva (Solo para docentes de grados regulares; se oculta para materias especiales) -->
+          <div id="panel-asignacion-rapida-masiva" style="background: #fdfbfd; border: 1px solid #ce93d8; border-radius: 8px; padding: 10px 16px; margin-bottom: 10px; flex-shrink: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px;">
+              <span style="color: #4a148c; font-weight: bold; font-size: 13px; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="material-icons tiny">bolt</i> Asignación Rápida Masiva:
+                <span style="font-weight: normal; color: #6a1b9a; font-size: 11.5px; margin-left: 6px;">(Márcalas aquí y pulsa el botón para aplicarlas a todos los grados en bloque)</span>
+              </span>
+              <button type="button" class="btn-small purple darken-2 waves-effect waves-light" onclick="window.aplicarAreasMasivasATodasLasPlanillas()" style="border-radius: 6px; font-size: 12px; height: 30px; line-height: 30px; text-transform: none; box-shadow: 0 2px 6px rgba(74,20,140,0.25);">
+                <i class="material-icons left tiny" style="margin-right: 4px;">done_all</i> Copiar estas áreas a todos los grados de abajo
+              </button>
+            </div>
+            
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center;">
+              <label class="chk-pill-label" style="background: #f3e5f5; border-color: #ab47bc;">
+                <input type="checkbox" id="chk-area-todas" class="filled-in" onchange="window.toggleTodasLasAreas(this.checked)" />
+                <span style="font-weight: bold; color: #4a148c; font-size: 12px;">🌟 Todas las Materias</span>
+              </label>
+              <label class="chk-pill-label" style="background: #e8f5e9; border-color: #81c784;">
+                <input type="checkbox" id="chk-area-datos" class="filled-in chk-area-individual" data-area="DATOS" />
+                <span style="font-weight: 700; color: #1b5e20; font-size: 12px;">👤 Área de Datos (Alumnos)</span>
+              </label>
+              <label class="chk-pill-label" style="background: #fff8e1; border-color: #ffe082;">
+                <input type="checkbox" id="chk-area-asistencia" class="filled-in chk-area-individual" data-area="ASISTENCIA" />
+                <span style="font-weight: 700; color: #f57f17; font-size: 12px;">📅 Asistencia y Conducta</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-lengua" class="filled-in chk-area-individual" data-area="LENGUA" />
+                <span style="color: #263238; font-size: 12px;">📝 Lengua</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-matematica" class="filled-in chk-area-individual" data-area="MATEMATICA" />
+                <span style="color: #263238; font-size: 12px;">🔢 Matemática</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-sociales" class="filled-in chk-area-individual" data-area="CS_SOCIALES" />
+                <span style="color: #263238; font-size: 12px;">🌍 Cs. Sociales</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-naturales" class="filled-in chk-area-individual" data-area="CS_NATURALES" />
+                <span style="color: #263238; font-size: 12px;">🔬 Cs. Naturales</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-ed-fisica" class="filled-in chk-area-individual" data-area="ED_FISICA" />
+                <span style="color: #263238; font-size: 12px;">🏃 Ed. Física</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-musica" class="filled-in chk-area-individual" data-area="MUSICA" />
+                <span style="color: #263238; font-size: 12px;">🎵 Música</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-plastica" class="filled-in chk-area-individual" data-area="PLASTICA" />
+                <span style="color: #263238; font-size: 12px;">🎨 Plástica</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-ingles" class="filled-in chk-area-individual" data-area="INGLES" />
+                <span style="color: #263238; font-size: 12px;">🌐 Inglés</span>
+              </label>
+              <label class="chk-pill-label">
+                <input type="checkbox" id="chk-area-tecnologia" class="filled-in chk-area-individual" data-area="TECNOLOGIA" />
+                <span style="color: #263238; font-size: 12px;">💻 Tecnología</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 3. Control de Bloqueo por Cuatrimestre -->
+          <div id="panel-bloqueo-cuatrimestres" style="background: #fbfbfc; border: 1px solid #cfd8dc; border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; flex-shrink: 0;">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px;">
+              <span style="font-weight: 700; color: #37474f; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                <i class="material-icons tiny">lock</i> Bloqueo Cuatrimestre (Docente actual):
+              </span>
+              <button type="button" class="btn-small orange darken-3 waves-effect waves-light" onclick="window.cambiarSoloLecturaPorCuatrimestreDocente(1, true)" title="Poner en Solo Lectura todas las planillas del 1er Cuatrimestre de este docente" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">lock</i> 1° Cuatri Solo Lectura
+              </button>
+              <button type="button" class="btn-small green darken-2 waves-effect waves-light" onclick="window.cambiarSoloLecturaPorCuatrimestreDocente(1, false)" title="Habilitar edición para planillas del 1er Cuatrimestre de este docente" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">lock_open</i> 1° Cuatri Editar
+              </button>
+              <button type="button" class="btn-small blue-grey darken-3 waves-effect waves-light" onclick="window.cambiarSoloLecturaPorCuatrimestreDocente(2, true)" title="Poner en Solo Lectura todas las planillas del 2do Cuatrimestre de este docente" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">lock</i> 2° Cuatri Solo Lectura
+              </button>
+              <button type="button" class="btn-small teal darken-2 waves-effect waves-light" onclick="window.cambiarSoloLecturaPorCuatrimestreDocente(2, false)" title="Habilitar edición para planillas del 2do Cuatrimestre de este docente" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">lock_open</i> 2° Cuatri Editar
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <button type="button" class="btn-small red darken-3 waves-effect waves-light" onclick="window.bloquearCuatrimestreGlobal(1, true)" title="Poner en Solo Lectura las planillas del 1er Cuatrimestre para TODOS los docentes del colegio" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">public</i> Bloquear 1° Cuatri (Todos)
+              </button>
+              <button type="button" class="btn-small deep-purple darken-3 waves-effect waves-light" onclick="window.bloquearCuatrimestreGlobal(2, true)" title="Poner en Solo Lectura las planillas del 2do Cuatrimestre para TODOS los docentes del colegio" style="border-radius: 6px; font-size: 11px; height: 26px; line-height: 26px; text-transform: none; padding: 0 9px;">
+                <i class="material-icons left tiny" style="margin-right: 3px;">public</i> Bloquear 2° Cuatri (Todos)
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. Encabezado de la Tabla y Botón Asignar Grado -->
+          <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;">
+            <span style="color: #37474f; font-weight: bold; font-size: 14px; display: inline-flex; align-items: center; gap: 6px;">
+              <i class="material-icons tiny">school</i> Grados Asignados y Permisos Individuales:
+              <span style="font-weight: normal; color: #78909c; font-size: 12px;">(Puedes configurar Datos o materias diferentes en cada grado)</span>
+            </span>
+            <button type="button" class="btn-small waves-effect waves-light purple darken-3" onclick="window.abrirAsignadorNuevaPlanilla()" style="border-radius: 6px; text-transform: none; font-size: 12px; height: 30px; line-height: 30px;">
+              <i class="material-icons left tiny" style="margin-right: 4px;">add</i> Asignar Nuevo Grado/Planilla
+            </button>
+          </div>
+
+          <!-- Fila para agregar planilla (inicialmente oculta) -->
+          <div id="fila-agregar-planilla" style="display: none; background: #fafafa; border: 1px dashed #7e57c2; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; flex-shrink: 0;">
+            <div class="row" style="margin-bottom: 0;">
+              <div class="col s12 m4">
+                <label style="font-size: 12px;">Grado:</label>
+                <select id="select-nuevo-grado" class="browser-default" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                  <option value="1">1° Grado</option>
+                  <option value="2">2° Grado</option>
+                  <option value="3">3° Grado</option>
+                  <option value="4">4° Grado</option>
+                  <option value="5">5° Grado</option>
+                  <option value="6">6° Grado</option>
+                </select>
+              </div>
+              <div class="col s12 m4">
+                <label style="font-size: 12px;">Sección:</label>
+                <select id="select-nueva-seccion" class="browser-default" style="padding: 6px; border-radius: 4px; border: 1px solid #ccc; width: 100%;">
+                  <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                  <option value="D">D</option><option value="E">E</option><option value="F">F</option>
+                  <option value="G">G</option><option value="H">H</option><option value="I">I</option>
+                  <option value="J">J</option><option value="K">K</option><option value="L">L</option>
+                </select>
+              </div>
+              <div class="col s12 m4" style="margin-top: 18px; display: flex; gap: 8px;">
+                <button class="btn-small green darken-1 waves-effect" onclick="window.confirmarAgregarPlanillaDocente()" style="border-radius: 4px;">Añadir</button>
+                <button class="btn-small grey lighten-1 waves-effect" onclick="document.getElementById('fila-agregar-planilla').style.display='none'" style="border-radius: 4px;">Cancelar</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Grados del Docente (Amplia, Flex 1 para aprovechar el alto de pantalla) -->
+          <div style="border: 1px solid #e0e0e0; border-radius: 8px; overflow-y: auto; flex: 1; min-height: 250px; background: #fff;">
+            <table class="striped highlight" style="font-size: 13px; width: 100%;">
+              <thead style="background: #ede7f6; position: sticky; top: 0; z-index: 5; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">
+                <tr>
+                  <th style="padding: 10px 14px; min-width: 250px;">Planilla / Curso</th>
+                  <th style="padding: 10px 14px; width: 180px; min-width: 180px; text-align: center; white-space: nowrap;">Área de Datos</th>
+                  <th style="padding: 10px 14px; min-width: 360px;">Áreas / Materias Habilitadas</th>
+                  <th style="padding: 10px 14px; width: 160px; min-width: 160px; text-align: center; white-space: nowrap;">Solo Lectura</th>
+                  <th style="padding: 10px 14px; width: 70px; text-align: center;">Acción</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-planillas-docente">
+                <!-- Se llena dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 26px; background: #fafafa; border-top: 1px solid #e0e0e0; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+        <button class="modal-close btn-flat waves-effect" style="margin: 0; font-weight: 500;">Cerrar</button>
+        <button id="btn-guardar-permisos-docente" class="btn waves-effect waves-light purple darken-3" style="border-radius: 6px; padding: 0 20px;" onclick="window.guardarPermisosDocenteDesdeUI()" disabled>
+          <i class="material-icons left">save</i> Guardar Permisos
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MODAL BUSCADOR GENERAL DE ALUMNOS (EXCLUSIVO ADMINISTRADOR)      -->
+    <!-- ================================================================ -->
+    <div id="modal-buscador-alumnos" class="modal modal-fixed-footer" style="border-radius: 14px;">
+      <div class="modal-content">
+        <!-- Encabezado -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0284c7; padding-bottom: 10px; margin-bottom: 12px; flex-shrink: 0; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h5 style="color: #0369a1; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.28rem;">
+              <i class="material-icons">person_search</i> Buscador General de Alumnos
+              <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Solo Administrador</span>
+            </h5>
+            <p style="color: #64748b; font-size: 12.5px; margin: 3px 0 0 0;">
+              Busca cualquier alumno por <strong>DNI</strong>, <strong>Grado</strong>, <strong>Apellido</strong> o <strong>Nombre</strong> y visualiza todas las coincidencias con sus datos personales completos.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <button type="button" id="btn-descargar-excel-alumnos" class="btn-small waves-effect waves-light green darken-2" style="border-radius: 8px; text-transform: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px;" onclick="window.descargarListasAlumnosExcel && window.descargarListasAlumnosExcel()" title="Descargar listas de todos los grados en formato Excel (.xlsx)">
+              <i class="material-icons left tiny" style="margin-right: 2px;">table_view</i> Descargar Excel
+            </button>
+            <button type="button" id="btn-imprimir-listas-alumnos" class="btn-small waves-effect waves-light indigo darken-2" style="border-radius: 8px; text-transform: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px;" onclick="window.imprimirListasAlumnosPorGrado && window.imprimirListasAlumnosPorGrado()" title="Imprimir listas de alumnos por grado y sección con formato de tabla">
+              <i class="material-icons left tiny" style="margin-right: 2px;">print</i> Imprimir Listas
+            </button>
+            <button type="button" class="btn-small waves-effect waves-light blue-grey lighten-5" style="color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px; text-transform: none; font-weight: 600; box-shadow: none;" onclick="window.recargarPadronBuscadorAlumnos && window.recargarPadronBuscadorAlumnos()" title="Actualizar padrón desde la base de datos">
+              <i class="material-icons left tiny" style="margin-right: 4px;">refresh</i> Actualizar padrón
+            </button>
+            <button type="button" class="modal-close btn-flat waves-effect" style="color: #64748b;" title="Cerrar ventana">
+              <i class="material-icons">close</i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros de Búsqueda -->
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; flex-shrink: 0;">
+          <div class="row" style="margin-bottom: 0; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0;">
+            <div class="col s12 m5 l6" style="margin-bottom: 6px;">
+              <label for="input-buscador-alumnos-texto" style="font-weight: 700; color: #1e293b; font-size: 12.5px; display: flex; align-items: center; gap: 4px;">
+                <i class="material-icons tiny" style="color: #0284c7;">search</i> DNI, Apellido, Nombre o Grado:
+              </label>
+              <input
+                id="input-buscador-alumnos-texto"
+                type="text"
+                class="browser-default"
+                placeholder="Ej: 56208042, Pérez, Juan, 3° B..."
+                autocomplete="off"
+                style="width: 100%; height: 38px; border: 1px solid #94a3b8; border-radius: 8px; padding: 0 12px; margin-top: 4px; font-size: 14px; background: #ffffff; box-sizing: border-box;"
+                oninput="window.filtrarBuscadorAlumnosEnVivo && window.filtrarBuscadorAlumnosEnVivo()"
+                onkeydown="if(event.key === 'Enter'){ event.preventDefault(); window.ejecutarBusquedaAlumnosAdmin && window.ejecutarBusquedaAlumnosAdmin(); }"
+              />
+            </div>
+
+            <div class="col s6 m3 l2" style="margin-bottom: 6px;">
+              <label for="select-buscador-alumnos-grado" style="font-weight: 700; color: #1e293b; font-size: 12.5px;">
+                Grado:
+              </label>
+              <select
+                id="select-buscador-alumnos-grado"
+                class="browser-default"
+                style="width: 100%; height: 38px; border: 1px solid #94a3b8; border-radius: 8px; padding: 0 10px; margin-top: 4px; font-size: 13.5px; background: #ffffff;"
+                onchange="window.ejecutarBusquedaAlumnosAdmin && window.ejecutarBusquedaAlumnosAdmin()"
+              >
+                <option value="">Todos los grados</option>
+                <option value="1">1° Grado</option>
+                <option value="2">2° Grado</option>
+                <option value="3">3° Grado</option>
+                <option value="4">4° Grado</option>
+                <option value="5">5° Grado</option>
+                <option value="6">6° Grado</option>
+              </select>
+            </div>
+
+            <div class="col s6 m2 l2" style="margin-bottom: 6px;">
+              <label for="select-buscador-alumnos-seccion" style="font-weight: 700; color: #1e293b; font-size: 12.5px;">
+                División / Sección:
+              </label>
+              <select
+                id="select-buscador-alumnos-seccion"
+                class="browser-default"
+                style="width: 100%; height: 38px; border: 1px solid #94a3b8; border-radius: 8px; padding: 0 10px; margin-top: 4px; font-size: 13.5px; background: #ffffff;"
+                onchange="window.ejecutarBusquedaAlumnosAdmin && window.ejecutarBusquedaAlumnosAdmin()"
+              >
+                <option value="">Todas</option>
+                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                <option value="D">D</option><option value="E">E</option><option value="F">F</option>
+                <option value="G">G</option><option value="H">H</option><option value="I">I</option>
+                <option value="J">J</option><option value="K">K</option><option value="L">L</option>
+              </select>
+            </div>
+
+            <div class="col s12 m2 l2" style="margin-bottom: 6px; display: flex; gap: 6px;">
+              <button
+                type="button"
+                id="btn-ejecutar-busqueda-alumnos"
+                class="btn waves-effect waves-light light-blue darken-3"
+                style="height: 38px; line-height: 38px; border-radius: 8px; padding: 0 14px; text-transform: none; font-weight: 600; flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"
+                onclick="window.ejecutarBusquedaAlumnosAdmin && window.ejecutarBusquedaAlumnosAdmin()"
+              >
+                <i class="material-icons tiny">search</i> Buscar
+              </button>
+              <button
+                type="button"
+                id="btn-limpiar-busqueda-alumnos"
+                class="btn waves-effect waves-light grey lighten-2"
+                style="height: 38px; line-height: 38px; border-radius: 8px; padding: 0 10px; color: #334155; box-shadow: none;"
+                title="Limpiar filtros"
+                onclick="window.limpiarFiltrosBuscadorAlumnos && window.limpiarFiltrosBuscadorAlumnos()"
+              >
+                <i class="material-icons" style="font-size: 1.15rem;">clear_all</i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Estado / Resumen de Coincidencias -->
+        <div id="barra-estado-buscador-alumnos" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 4px; flex-shrink: 0; font-size: 13px; color: #475569; flex-wrap: wrap; gap: 6px;">
+          <span id="texto-contador-buscador-alumnos" style="font-weight: 600; color: #0f172a;">
+            Ingresa un DNI, apellido, nombre o selecciona un grado para buscar.
+          </span>
+          <span id="badge-padron-total-alumnos" style="font-size: 12px; color: #64748b;"></span>
+        </div>
+
+        <!-- Contenedor de Resultados (Scrollable) -->
+        <div id="contenedor-resultados-buscador-alumnos" style="flex: 1; min-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #f1f5f9;">
+          <div class="center-align" style="padding: 40px 20px; color: #64748b;">
+            <i class="material-icons" style="font-size: 3.2rem; color: #94a3b8; display: block; margin-bottom: 8px;">manage_search</i>
+            <p style="margin: 0; font-size: 1rem; font-weight: 500; color: #334155;">Buscador General de Alumnos</p>
+            <p style="margin: 4px 0 0 0; font-size: 0.88rem;">Escribe un DNI, apellido, nombre o selecciona un grado para ver todas las coincidencias y sus datos personales.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 10px 24px; background: #fafafa; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 4px;">
+          <i class="material-icons tiny" style="color: #0284c7;">verified_user</i> Vista exclusiva para cuentas de Administrador
+        </span>
+        <button type="button" class="modal-close btn waves-effect waves-light blue-grey darken-1" style="border-radius: 8px; text-transform: none; height: 36px; line-height: 36px;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MODAL HISTORIAL DE VERSIONES Y RESTAURACIÓN POR ALUMNO (OPCIÓN A)-->
+    <!-- ================================================================ -->
+    <div id="modal-historial-alumno" class="modal modal-fixed-footer" style="border-radius: 14px;">
+      <div class="modal-content">
+        <!-- Encabezado -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #5e35b1; padding-bottom: 10px; margin-bottom: 12px; flex-shrink: 0; flex-wrap: wrap; gap: 8px;">
+          <div>
+            <h5 style="color: #4527a0; font-weight: bold; margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.25rem; flex-wrap: wrap;">
+              <i class="material-icons">history</i>
+              <span id="historial-alumno-titulo">Historial y Restauración del Alumno</span>
+              <span style="background: #ede7f6; color: #4527a0; border: 1px solid #d1c4e9; font-size: 0.68rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Time-Travel / Rollback</span>
+            </h5>
+            <p id="historial-alumno-subtitulo" style="color: #64748b; font-size: 12.5px; margin: 3px 0 0 0;">
+              Visualiza los cambios de notas y datos personales por fecha y restaura cualquier valor anterior con un clic.
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <button type="button" id="btn-crear-snapshot-alumno" class="btn-small waves-effect waves-light deep-purple darken-1" style="border-radius: 8px; text-transform: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 0 12px;" onclick="window.crearSnapshotManualAlumnoActual && window.crearSnapshotManualAlumnoActual()" title="Guardar una copia de seguridad de todas las notas y datos actuales de este alumno ahora mismo">
+              <i class="material-icons left tiny" style="margin-right: 2px;">add_a_photo</i> Guardar Punto de Restauración Actual
+            </button>
+            <button type="button" class="btn-small waves-effect waves-light blue-grey lighten-5" style="color: #4527a0; border: 1px solid #d1c4e9; border-radius: 8px; text-transform: none; font-weight: 600; box-shadow: none;" onclick="window.recargarHistorialAlumnoActual && window.recargarHistorialAlumnoActual()" title="Recargar línea de tiempo">
+              <i class="material-icons left tiny" style="margin-right: 4px;">refresh</i> Actualizar
+            </button>
+            <button type="button" class="modal-close btn-flat waves-effect" style="color: #64748b;" title="Cerrar ventana">
+              <i class="material-icons">close</i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros del Historial del Alumno -->
+        <div style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; flex-shrink: 0;">
+          <div class="row" style="margin-bottom: 0; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0;">
+            <div class="col s12 m5 l5" style="margin-bottom: 4px;">
+              <label for="select-historial-alumno-hoja" style="font-weight: 700; color: #1e293b; font-size: 12px; display: block;">
+                Filtrar por Materia / Hoja:
+              </label>
+              <select
+                id="select-historial-alumno-hoja"
+                class="browser-default"
+                style="width: 100%; height: 36px; border: 1px solid #94a3b8; border-radius: 8px; padding: 0 10px; margin-top: 3px; font-size: 13px; background: #ffffff;"
+                onchange="window.filtrarTimelineHistorialAlumno && window.filtrarTimelineHistorialAlumno()"
+              >
+                <option value="">📋 Todas las materias y datos del alumno</option>
+              </select>
+            </div>
+
+            <div class="col s12 m4 l4" style="margin-bottom: 4px;">
+              <label for="input-historial-alumno-fecha" style="font-weight: 700; color: #1e293b; font-size: 12px; display: block;">
+                Filtrar por Fecha (opcional):
+              </label>
+              <div style="display: flex; gap: 6px; margin-top: 3px;">
+                <input
+                  id="input-historial-alumno-fecha"
+                  type="date"
+                  class="browser-default"
+                  style="flex: 1; height: 36px; border: 1px solid #94a3b8; border-radius: 8px; padding: 0 10px; font-size: 13px; background: #ffffff; box-sizing: border-box;"
+                  onchange="window.filtrarTimelineHistorialAlumno && window.filtrarTimelineHistorialAlumno()"
+                />
+                <button
+                  type="button"
+                  class="btn-small waves-effect grey lighten-2"
+                  style="height: 36px; line-height: 36px; border-radius: 8px; padding: 0 10px; color: #334155; box-shadow: none;"
+                  title="Ver todas las fechas"
+                  onclick="document.getElementById('input-historial-alumno-fecha').value=''; window.filtrarTimelineHistorialAlumno && window.filtrarTimelineHistorialAlumno();"
+                >
+                  Todas
+                </button>
+              </div>
+            </div>
+
+            <div class="col s12 m3 l3" style="margin-bottom: 4px; display: flex; align-items: center; height: 38px;">
+              <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #1e293b; font-size: 12.5px; font-weight: 600;">
+                <input
+                  type="checkbox"
+                  id="chk-historial-todas-planillas"
+                  checked
+                  onchange="window.recargarHistorialAlumnoActual && window.recargarHistorialAlumnoActual()"
+                />
+                <span style="padding-left: 24px; line-height: 1.2;">Incluir todas las planillas (1°/2° Cuat. y Especiales)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Resumen de Estado Actual de la Hoja Activa -->
+        <div id="contenedor-estado-actual-alumno" style="margin-bottom: 10px; flex-shrink: 0;"></div>
+
+        <!-- Contenedor de Línea de Tiempo (Scrollable) -->
+        <div id="contenedor-timeline-historial-alumno" style="flex: 1; min-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #f1f5f9;">
+          <div class="center-align" style="padding: 40px 20px; color: #64748b;">
+            <i class="material-icons" style="font-size: 3rem; color: #94a3b8; display: block; margin-bottom: 8px;">history</i>
+            <p style="margin: 0; font-size: 0.95rem;">Cargando historial del alumno...</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="padding: 10px 24px; background: #fafafa; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+        <span id="historial-alumno-contador-footer" style="font-size: 12px; color: #64748b; display: inline-flex; align-items: center; gap: 4px;">
+          <i class="material-icons tiny" style="color: #5e35b1;">restore</i> Al restaurar una nota o dato, se recalcula el promedio y el boletín automáticamente.
+        </span>
+        <button type="button" class="modal-close btn waves-effect waves-light blue-grey darken-1" style="border-radius: 8px; text-transform: none; height: 36px; line-height: 36px;">
+          Cerrar
+        </button>
+      </div>
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- MODAL AGREGAR ALUMNO AL GRADO (FICHA COMPLETA ÁREA DE DATOS)     -->
+    <!-- ================================================================ -->
+    <div id="modal-agregar-alumno-grado" class="modal" style="border-radius: 14px;">
+      <form id="form-agregar-alumno-grado" aria-labelledby="titulo-modal-agregar-alumno" method="POST" action="#agregar-alumno" autocomplete="off" novalidate>
+        <div class="modal-content">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #16a34a; padding-bottom: 10px; margin-bottom: 14px; gap: 10px;">
+            <div>
+              <h5 id="titulo-modal-agregar-alumno" style="color: #15803d; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 8px; font-size: 1.25rem; flex-wrap: wrap;">
+                <i class="material-icons">person_add</i>
+                <span>Agregar Alumno al Grado — Ficha Completa de Datos</span>
+                <span id="badge-grado-agregar-alumno" style="background: #dcfce7; color: #166534; border: 1px solid #86efac; font-size: 0.75rem; padding: 2px 10px; border-radius: 999px; font-weight: 700;">Grado actual</span>
+              </h5>
+              <p style="color: #475569; font-size: 0.82rem; margin: 4px 0 0 0;">
+                Completa los datos personales y familiares del alumno (Progenitor A, Progenitor B, Auxiliar, Bautismo y Domicilio). Se ubicará automáticamente en su número de orden reglamentario (Varones A–Z y Mujeres A–Z).
+              </p>
+            </div>
+            <button type="button" class="modal-close btn-flat waves-effect" style="color: #64748b; padding: 0 8px;" title="Cerrar ventana">
+              <i class="material-icons">close</i>
+            </button>
+          </div>
+
+          <!-- Aviso dinámico de verificación de DNI o errores -->
+          <div id="estado-verificacion-nuevo-alumno" role="status" aria-live="polite" style="display: none; margin-bottom: 14px; padding: 10px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 600;"></div>
+
+          <!-- ============================================================ -->
+          <!-- BLOQUE 1: DATOS PERSONALES, NACIMIENTO, DOMICILIO Y BAUTISMO -->
+          <!-- ============================================================ -->
+          <fieldset class="seccion-ficha-nuevo-alumno">
+            <legend><i class="material-icons tiny">badge</i> 1. Datos Personales, Nacimiento, Domicilio y Bautismo del Alumno</legend>
+
+            <div class="row" style="margin-bottom: 0; margin-top: 6px;">
+              <!-- DNI -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-dni">DNI (solo números): <span aria-hidden="true" style="color: #b91c1c;">*</span></label>
+                  <input
+                    type="search"
+                    id="input-nuevo-alumno-dni"
+                    name="buscar_alumno_doc"
+                    class="browser-default input-nuevo-alumno-box"
+                    inputmode="numeric"
+                    maxlength="10"
+                    autocomplete="off"
+                    autocorrect="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                    enterkeyhint="next"
+                    aria-describedby="ayuda-nuevo-alumno-dni error-nuevo-alumno-dni"
+                    required
+                  />
+                  <span id="ayuda-nuevo-alumno-dni" class="ayuda-campo-nuevo-alumno">6 a 10 dígitos sin puntos. Si existe, autocompleta su ficha.</span>
+                  <span id="error-nuevo-alumno-dni" class="error-campo-nuevo-alumno"><i class="material-icons tiny">error</i> Ingresa un DNI válido de 6 a 10 números.</span>
+                </div>
+              </div>
+
+              <!-- APELLIDO -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-apellido">APELLIDO: <span aria-hidden="true" style="color: #b91c1c;">*</span></label>
+                  <input
+                    type="text"
+                    id="input-nuevo-alumno-apellido"
+                    name="apellido"
+                    class="browser-default input-nuevo-alumno-box"
+                    maxlength="80"
+                    autocomplete="off"
+                    enterkeyhint="next"
+                    aria-describedby="error-nuevo-alumno-apellido"
+                    required
+                  />
+                  <span id="error-nuevo-alumno-apellido" class="error-campo-nuevo-alumno"><i class="material-icons tiny">error</i> Ingresa el apellido del alumno.</span>
+                </div>
+              </div>
+
+              <!-- NOMBRE -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-nombre">NOMBRE: <span aria-hidden="true" style="color: #b91c1c;">*</span></label>
+                  <input
+                    type="text"
+                    id="input-nuevo-alumno-nombre"
+                    name="nombre"
+                    class="browser-default input-nuevo-alumno-box"
+                    maxlength="80"
+                    autocomplete="off"
+                    enterkeyhint="next"
+                    aria-describedby="error-nuevo-alumno-nombre"
+                    required
+                  />
+                  <span id="error-nuevo-alumno-nombre" class="error-campo-nuevo-alumno"><i class="material-icons tiny">error</i> Ingresa el nombre del alumno.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SEXO -->
+            <div class="row" style="margin-bottom: 0;">
+              <div class="col s12">
+                <fieldset id="fieldset-nuevo-alumno-sexo" class="fieldset-sexo-nuevo-alumno" aria-describedby="error-nuevo-alumno-sexo">
+                  <legend>SEXO (para el orden reglamentario de la lista): <span aria-hidden="true" style="color: #b91c1c;">*</span></legend>
+                  <div style="display: flex; flex-wrap: wrap; align-items: center;">
+                    <div class="radio-sexo-opcion">
+                      <input type="radio" id="radio-nuevo-alumno-sexo-v" name="sexo" value="V" required />
+                      <label for="radio-nuevo-alumno-sexo-v">👦 Varón (V)</label>
+                    </div>
+                    <div class="radio-sexo-opcion">
+                      <input type="radio" id="radio-nuevo-alumno-sexo-m" name="sexo" value="M" required />
+                      <label for="radio-nuevo-alumno-sexo-m">👧 Mujer (M)</label>
+                    </div>
+                  </div>
+                  <span id="error-nuevo-alumno-sexo" class="error-campo-nuevo-alumno"><i class="material-icons tiny">error</i> Selecciona el sexo del alumno para calcular su número de orden.</span>
+                </fieldset>
+              </div>
+            </div>
+
+            <div class="row" style="margin-bottom: 0;">
+              <!-- LUGAR DE NAC. -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-lugar-nac">LUGAR DE NAC.:</label>
+                  <input type="text" id="input-nuevo-alumno-lugar-nac" name="lugar_nacimiento" data-datos-key="LUGAR DE NAC." class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+
+              <!-- FECHA DE NAC -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-fecha-nac">FECHA DE NAC (DD/MM/AAAA):</label>
+                  <input type="text" id="input-nuevo-alumno-fecha-nac" name="fecha_nacimiento" data-datos-key="FECHA DE NAC" class="browser-default input-nuevo-alumno-box" placeholder="DD/MM/AAAA" maxlength="20" autocomplete="off" enterkeyhint="next" />
+                </div>
+              </div>
+
+              <!-- DIRECCIÓN -->
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-direccion">DIRECCIÓN:</label>
+                  <input type="text" id="input-nuevo-alumno-direccion" name="direccion" data-datos-key="DIRECCIÓN" class="browser-default input-nuevo-alumno-box" maxlength="140" autocomplete="off" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+
+            <div class="row" style="margin-bottom: 0;">
+              <!-- LUGAR DE BAUTISMO -->
+              <div class="col s12 m6">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-lugar-bautismo">LUGAR DE BAUTISMO:</label>
+                  <input type="text" id="input-nuevo-alumno-lugar-bautismo" name="lugar_bautismo" data-datos-key="LUGAR DE BAUTISMO" class="browser-default input-nuevo-alumno-box" maxlength="120" enterkeyhint="next" />
+                </div>
+              </div>
+
+              <!-- FECHA DE BAUTISMO -->
+              <div class="col s12 m6">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-fecha-bautismo">FECHA DE BAUTISMO (DD/MM/AAAA):</label>
+                  <input type="text" id="input-nuevo-alumno-fecha-bautismo" name="fecha_bautismo" data-datos-key="FECHA DE BAUTISMO" class="browser-default input-nuevo-alumno-box" placeholder="DD/MM/AAAA" maxlength="20" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- ============================================================ -->
+          <!-- BLOQUE 2: PROGENITOR / TUTOR A (7 CAMPOS DE HOJA DATOS)      -->
+          <!-- ============================================================ -->
+          <fieldset class="seccion-ficha-nuevo-alumno seccion-prog-a">
+            <legend><i class="material-icons tiny">family_restroom</i> 2. Datos del Progenitor / Tutor A</legend>
+
+            <div class="row" style="margin-bottom: 0; margin-top: 6px;">
+              <div class="col s12 m6">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-prog-a">APELLIDO Y NOMBRE PROGENITOR A:</label>
+                  <input type="text" id="input-nuevo-alumno-prog-a" name="progenitor_a" data-datos-key="APELLIDO Y NOMBRE PROGENITOR A" class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-dni-prog-a">DNI PROG A:</label>
+                  <input type="text" id="input-nuevo-alumno-dni-prog-a" name="dni_prog_a" data-datos-key="DNI PROG A" class="browser-default input-nuevo-alumno-box" inputmode="numeric" maxlength="15" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-tel-prog-a">TELF. CELULAR PROG A:</label>
+                  <input type="tel" id="input-nuevo-alumno-tel-prog-a" name="tel_progenitor_a" data-datos-key="TELF. CELULAR PROG A" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+
+            <div class="row" style="margin-bottom: 0;">
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-fijo-prog-a">TELF. FIJO PROG A:</label>
+                  <input type="tel" id="input-nuevo-alumno-fijo-prog-a" name="fijo_prog_a" data-datos-key="TELF. FIJO PROG A" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-prof-prog-a">PROFESIÓN PROG A:</label>
+                  <input type="text" id="input-nuevo-alumno-prof-prog-a" name="prof_prog_a" data-datos-key="PROFESIÓN PROG A" class="browser-default input-nuevo-alumno-box" maxlength="80" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-trab-prog-a">LUGAR DE TRABAJO PROG A:</label>
+                  <input type="text" id="input-nuevo-alumno-trab-prog-a" name="trab_prog_a" data-datos-key="LUGAR DE TRABAJO PROG A" class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-hor-prog-a">HORARIO PROG A:</label>
+                  <input type="text" id="input-nuevo-alumno-hor-prog-a" name="hor_prog_a" data-datos-key="HORARIO PROG A" class="browser-default input-nuevo-alumno-box" maxlength="60" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- ============================================================ -->
+          <!-- BLOQUE 3: PROGENITOR / TUTOR B (7 CAMPOS DE HOJA DATOS)      -->
+          <!-- ============================================================ -->
+          <fieldset class="seccion-ficha-nuevo-alumno seccion-prog-b">
+            <legend><i class="material-icons tiny">family_restroom</i> 3. Datos del Progenitor / Tutor B</legend>
+
+            <div class="row" style="margin-bottom: 0; margin-top: 6px;">
+              <div class="col s12 m6">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-prog-b">APELLIDO Y NOMBRE PROGENITOR B:</label>
+                  <input type="text" id="input-nuevo-alumno-prog-b" name="progenitor_b" data-datos-key="APELLIDO Y NOMBRE PROGENITOR B" class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-dni-prog-b">DNI PROG B:</label>
+                  <input type="text" id="input-nuevo-alumno-dni-prog-b" name="dni_prog_b" data-datos-key="DNI PROG B" class="browser-default input-nuevo-alumno-box" inputmode="numeric" maxlength="15" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-tel-prog-b">TELF. CELULAR PROG B:</label>
+                  <input type="tel" id="input-nuevo-alumno-tel-prog-b" name="tel_progenitor_b" data-datos-key="TELF. CELULAR PROG B" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+
+            <div class="row" style="margin-bottom: 0;">
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-fijo-prog-b">TELF. FIJO PROG B:</label>
+                  <input type="tel" id="input-nuevo-alumno-fijo-prog-b" name="fijo_prog_b" data-datos-key="TELF. FIJO PROG B" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-prof-prog-b">PROFESIÓN PROG B:</label>
+                  <input type="text" id="input-nuevo-alumno-prof-prog-b" name="prof_prog_b" data-datos-key="PROFESIÓN PROG B" class="browser-default input-nuevo-alumno-box" maxlength="80" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-trab-prog-b">LUGAR DE TRABAJO PROG B:</label>
+                  <input type="text" id="input-nuevo-alumno-trab-prog-b" name="trab_prog_b" data-datos-key="LUGAR DE TRABAJO PROG B" class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-hor-prog-b">HORARIO PROG B:</label>
+                  <input type="text" id="input-nuevo-alumno-hor-prog-b" name="hor_prog_b" data-datos-key="HORARIO PROG B" class="browser-default input-nuevo-alumno-box" maxlength="60" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+          </fieldset>
+
+          <!-- ============================================================ -->
+          <!-- BLOQUE 4: CONTACTO AUXILIAR Y OBSERVACIONES                  -->
+          <!-- ============================================================ -->
+          <fieldset class="seccion-ficha-nuevo-alumno seccion-auxiliar" style="margin-bottom: 4px;">
+            <legend><i class="material-icons tiny">contact_phone</i> 4. Contacto Auxiliar y Observaciones</legend>
+
+            <div class="row" style="margin-bottom: 0; margin-top: 6px;">
+              <div class="col s12 m4">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-aux-nombre">APELLIDO Y NOMBRE AUXILIAR:</label>
+                  <input type="text" id="input-nuevo-alumno-aux-nombre" name="auxiliar_nombre" data-datos-key="APELLIDO Y NOMBRE AUXILIAR" class="browser-default input-nuevo-alumno-box" maxlength="100" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m2">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-aux-dni">DNI AUXILIAR:</label>
+                  <input type="text" id="input-nuevo-alumno-aux-dni" name="auxiliar_dni" data-datos-key="DNI AUXILIAR" class="browser-default input-nuevo-alumno-box" inputmode="numeric" maxlength="15" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-aux-cel">TELF. CELULAR AUXILIAR:</label>
+                  <input type="tel" id="input-nuevo-alumno-aux-cel" name="auxiliar_celular" data-datos-key="TELF. CELULAR AUXILIAR" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+              <div class="col s12 m3">
+                <div class="campo-form-nuevo-alumno">
+                  <label for="input-nuevo-alumno-aux-fijo">TELF. FIJO AUXILIAR:</label>
+                  <input type="tel" id="input-nuevo-alumno-aux-fijo" name="auxiliar_fijo" data-datos-key="TELF. FIJO AUXILIAR" class="browser-default input-nuevo-alumno-box" maxlength="40" enterkeyhint="next" />
+                </div>
+              </div>
+            </div>
+
+            <div class="row" style="margin-bottom: 0;">
+              <div class="col s12">
+                <div class="campo-form-nuevo-alumno" style="margin-bottom: 6px;">
+                  <label for="input-nuevo-alumno-observaciones">OBSERVACIONES:</label>
+                  <input type="text" id="input-nuevo-alumno-observaciones" name="observaciones" data-datos-key="OBSERVACIONES" class="browser-default input-nuevo-alumno-box" maxlength="250" enterkeyhint="done" />
+                </div>
+              </div>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="modal-footer" style="padding: 12px 24px; background: #fafafa; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; align-items: center; gap: 10px;">
+          <button type="button" class="modal-close btn-flat waves-effect" style="margin: 0; font-weight: 600; color: #475569;">
+            Cancelar
+          </button>
+          <button type="submit" id="btn-confirmar-agregar-alumno" class="btn waves-effect waves-light green darken-2" style="border-radius: 8px; text-transform: none; font-weight: 700; height: 40px; line-height: 40px; padding: 0 18px; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="material-icons left" style="margin-right: 4px;">person_add</i>
+            <span>Agregar Alumno al Grado</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  
+  </body>
+</html>
