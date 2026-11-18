@@ -186,11 +186,7 @@ function getRandomAppsScriptUrl() {
     return APPS_SCRIPT_API_URLS[Math.floor(Math.random() * APPS_SCRIPT_API_URLS.length)];
 }
 const APPS_SCRIPT_API_URL = getRandomAppsScriptUrl();
-const isNetlifyHost = typeof window !== 'undefined' && window.location && (
-    (window.location.hostname && (window.location.hostname.endsWith('netlify.app') || window.location.hostname.includes('netlify'))) ||
-    window.location.port === '8888'
-);
-let API_URL = window.APP_API_URL || (isNetlifyHost ? '/api' : APPS_SCRIPT_API_URL);
+let API_URL = window.APP_API_URL || APPS_SCRIPT_API_URL;
 const NETWORK_RETRY_MAX = 3;
 const COURSE_LOAD_TIMEOUT_MS = 120000;
 // Authentication reads the index spreadsheet and can take longer on a cold
@@ -1945,20 +1941,24 @@ async function solicitarOTP() {
             return;
         }
 
-        // 2. Enviar el correo con la clave exacta de la base de datos
+        // 2. Enviar el correo con la clave exacta de la base de datos (solo si corre el servidor local)
         let enviado = false;
-        try {
-            const resp = await fetch('/api/enviar-codigo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: emailInput, codigo: claveAsignada })
-            });
-            const resJson = await resp.json().catch(() => ({}));
-            if (resp.ok && resJson.exito) {
-                enviado = true;
+        const isLocalServer = typeof window !== 'undefined' && window.location &&
+            /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
+        if (isLocalServer) {
+            try {
+                const resp = await fetch('/api/enviar-codigo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: emailInput, codigo: claveAsignada })
+                });
+                const resJson = await resp.json().catch(() => ({}));
+                if (resp.ok && resJson.exito) {
+                    enviado = true;
+                }
+            } catch (eServidor) {
+                console.warn("Endpoint /api/enviar-codigo no disponible:", eServidor);
             }
-        } catch (eServidor) {
-            console.warn("Endpoint /api/enviar-codigo no disponible:", eServidor);
         }
 
         btn.innerHTML = btn.getAttribute('data-texto-original');
@@ -9918,12 +9918,7 @@ function getRandomAppsScriptUrl() {
     return APPS_SCRIPT_API_URLS[Math.floor(Math.random() * APPS_SCRIPT_API_URLS.length)];
 }
 
-const isNetlifyHost = typeof window !== 'undefined' && window.location && (
-    (window.location.hostname && (window.location.hostname.endsWith('netlify.app') || window.location.hostname.includes('netlify'))) ||
-    window.location.port === '8888'
-);
-
-let API_URL = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : (isNetlifyHost ? '/api' : getRandomAppsScriptUrl());
+let API_URL = (typeof window !== 'undefined' && window.APP_API_URL) ? window.APP_API_URL : getRandomAppsScriptUrl();
 if (typeof window !== 'undefined') {
     window.API_URL = API_URL;
     window.APPS_SCRIPT_API_URLS = APPS_SCRIPT_API_URLS;
