@@ -1941,11 +1941,36 @@ async function solicitarOTP() {
             return;
         }
 
-        // 2. Enviar el correo con la clave exacta de la base de datos (solo si corre el servidor local)
+        // 2. Enviar el correo con la clave de la base de datos mediante Supabase Edge Function
         let enviado = false;
+        let motivoErrorEnvio = '';
+
+        try {
+            const respEdge = await fetch(`${supabaseUrl}/functions/v1/enviar-codigo`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'apikey': supabaseKey,
+                    'Authorization': `Bearer ${supabaseKey}`
+                },
+                body: JSON.stringify({ email: emailInput })
+            });
+            const resEdge = await respEdge.json().catch(() => ({}));
+            if (respEdge.ok && resEdge.exito) {
+                enviado = true;
+            } else {
+                motivoErrorEnvio = resEdge.mensaje || `HTTP ${respEdge.status}`;
+                console.warn("Edge Function enviar-codigo respondió sin éxito:", resEdge);
+            }
+        } catch (eEdge) {
+            motivoErrorEnvio = eEdge && eEdge.message ? eEdge.message : 'Error de red';
+            console.warn("Error llamando a Edge Function enviar-codigo:", eEdge);
+        }
+
+        // Respaldo opcional solo si corre el servidor local (server.js)
         const isLocalServer = typeof window !== 'undefined' && window.location &&
             /^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname || '');
-        if (isLocalServer) {
+        if (!enviado && isLocalServer) {
             try {
                 const resp = await fetch('/api/enviar-codigo', {
                     method: 'POST',
@@ -1955,6 +1980,7 @@ async function solicitarOTP() {
                 const resJson = await resp.json().catch(() => ({}));
                 if (resp.ok && resJson.exito) {
                     enviado = true;
+                    motivoErrorEnvio = '';
                 }
             } catch (eServidor) {
                 console.warn("Endpoint /api/enviar-codigo no disponible:", eServidor);
@@ -1964,13 +1990,19 @@ async function solicitarOTP() {
         btn.innerHTML = btn.getAttribute('data-texto-original');
         btn.disabled = false;
 
-        document.getElementById('paso-correo').style.display = 'none';
-        document.getElementById('paso-codigo').style.display = 'block';
-
         if (enviado) {
+            document.getElementById('paso-correo').style.display = 'none';
+            document.getElementById('paso-codigo').style.display = 'block';
             M.toast({html: 'Tu código de acceso ha sido enviado a tu correo.', classes: 'green darken-1'});
         } else {
-            M.toast({html: 'Ingresa tu clave de acceso de 6 dígitos.', classes: 'blue darken-2', displayLength: 5000});
+            document.getElementById('paso-correo').style.display = 'none';
+            document.getElementById('paso-codigo').style.display = 'block';
+            const detalle = motivoErrorEnvio ? ` (${motivoErrorEnvio})` : '';
+            M.toast({
+                html: `No se pudo enviar el correo${detalle}. Si ya tienes tu clave de 6 dígitos, ingrésala aquí.`,
+                classes: 'orange darken-3',
+                displayLength: 7000
+            });
         }
 
     } catch (err) {
